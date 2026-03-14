@@ -36,7 +36,8 @@ Useful manual checks:
 
 ```bash
 cargo run -- schema
-cargo run -- prompt --agent-type codex
+cargo run -- prompt --agent-type codex --source session --goal walkthrough
+cargo run -- prompt --agent-type claude --source branch --goal handoff --artifact /tmp/handoff.json
 cargo run -- example --preset walkthrough
 cargo run -- validate --input payload.json
 cargo run -- render --input payload.json --format terminal
@@ -60,6 +61,7 @@ The current scaffold supports:
 
 - JSON Schema generation
 - agent-oriented prompt templates
+- prompt templates that adapt to evidence source and artifact goal
 - built-in starter payloads for agents
 - payload validation
 - deterministic rendering for `terminal`, `markdown`, and `html`

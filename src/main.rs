@@ -15,7 +15,7 @@ const AFTER_HELP: &str = "\
 Magellan is a deterministic presentation engine for AI-generated walkthroughs.
 
 Agent workflow:
-  1. Inspect the code, diff, tests, and session yourself.
+  1. Choose the right source of evidence and goal for the artifact you want.
   2. Run `magellan schema` and optionally `magellan example --preset walkthrough`.
   3. Create a JSON payload with short summaries, short sections, and optional diagrams.
   4. Validate it with `magellan validate --input WALKTHROUGH.json`.
@@ -30,9 +30,28 @@ Rules:
 
 Agent-specific prompt templates:
   magellan prompt --agent-type codex
-  magellan prompt --agent-type claude
+  magellan prompt --agent-type claude --source session --goal walkthrough
+  magellan prompt --agent-type codex --source diff --goal followup --topic \"why did this flow change?\"
+  magellan prompt --agent-type codex --source branch --goal handoff --focus verification --focus decisions
 
 Use `--input -` to read JSON from stdin.";
+
+const PROMPT_AFTER_HELP: &str = "\
+Examples:
+  magellan prompt --agent-type codex --source session --goal walkthrough --topic \"what we built in this session\"
+  magellan prompt --agent-type claude --source diff --goal followup --topic \"why did this API flow change?\"
+  magellan prompt --agent-type codex --source pr --goal handoff --artifact /tmp/handoff.json --focus verification --focus decisions
+
+Goals:
+  walkthrough  Create a broad narrated explainer of the change.
+  followup     Answer a narrower question with a tighter artifact.
+  handoff      Prepare another engineer to pick up the work quickly.
+
+Sources:
+  session      Use session messages, tool actions, and timestamps.
+  diff         Use the active diff or commit range as the main evidence.
+  branch       Compare the current branch to trunk.
+  pr           Use pull request description, comments, and diff.";
 
 #[derive(Parser, Debug)]
 #[command(
@@ -51,10 +70,29 @@ enum Command {
     /// Print the JSON Schema for Magellan's input payload.
     Schema,
     /// Print an agent-oriented prompt template for producing a Magellan walkthrough.
+    #[command(after_help = PROMPT_AFTER_HELP)]
     Prompt {
         /// Which coding agent the prompt should be tailored for.
         #[arg(long)]
         agent_type: CliAgentType,
+        /// What source of evidence the agent should inspect first.
+        #[arg(long, default_value = "session")]
+        source: CliPromptSource,
+        /// What kind of explainer artifact the agent should produce.
+        #[arg(long, default_value = "walkthrough")]
+        goal: CliPromptGoal,
+        /// What the walkthrough should explain.
+        #[arg(long, default_value = "what we built in this task")]
+        topic: String,
+        /// Where the agent should write the payload JSON before rendering it.
+        #[arg(long, default_value = "/tmp/magellan.json")]
+        artifact: PathBuf,
+        /// Render target the agent should aim for in the final step.
+        #[arg(long, default_value = "html")]
+        render_format: CliOutputFormat,
+        /// Areas to emphasize in the walkthrough. Repeat to provide multiple focuses.
+        #[arg(long)]
+        focus: Vec<CliPromptFocus>,
     },
     /// Print a starter payload that agents can edit before rendering.
     Example {
@@ -105,6 +143,30 @@ enum CliAgentType {
     Claude,
 }
 
+#[derive(Clone, Copy, Debug, ValueEnum)]
+enum CliPromptFocus {
+    Behavior,
+    Architecture,
+    Timeline,
+    Verification,
+    Decisions,
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
+enum CliPromptSource {
+    Session,
+    Diff,
+    Branch,
+    Pr,
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
+enum CliPromptGoal {
+    Walkthrough,
+    Followup,
+    Handoff,
+}
+
 impl From<CliOutputFormat> for OutputFormat {
     fn from(value: CliOutputFormat) -> Self {
         match value {
@@ -132,8 +194,25 @@ fn main() -> Result<()> {
         Command::Schema => {
             println!("{}", schema_json()?);
         }
-        Command::Prompt { agent_type } => {
-            println!("{}", prompt_text(agent_type));
+        Command::Prompt {
+            agent_type,
+            source,
+            goal,
+            topic,
+            artifact,
+            render_format,
+            focus,
+        } => {
+            let options = PromptOptions {
+                agent_type,
+                source,
+                goal,
+                topic: topic.as_str(),
+                artifact: artifact.as_path(),
+                render_format: render_format.into(),
+                focus: &focus,
+            };
+            println!("{}", prompt_text(options));
         }
         Command::Example { preset } => {
             let document = example_document(preset.into());
@@ -172,11 +251,75 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn prompt_text(agent_type: CliAgentType) -> &'static str {
-    match agent_type {
-        CliAgentType::Codex => CODEX_PROMPT,
-        CliAgentType::Claude => CLAUDE_PROMPT,
-    }
+struct PromptOptions<'a> {
+    agent_type: CliAgentType,
+    source: CliPromptSource,
+    goal: CliPromptGoal,
+    topic: &'a str,
+    artifact: &'a Path,
+    render_format: OutputFormat,
+    focus: &'a [CliPromptFocus],
+}
+
+fn prompt_text(options: PromptOptions<'_>) -> String {
+    let agent_name = match options.agent_type {
+        CliAgentType::Codex => "Codex",
+        CliAgentType::Claude => "Claude Code",
+    };
+    let render_command = format_render_command(options.artifact, options.render_format);
+    let focus_guidance = prompt_focus_guidance(options.focus);
+    let source_guidance = prompt_source_guidance(options.source);
+    let goal_guidance = prompt_goal_guidance(options.goal);
+    let section_guidance = prompt_goal_section_guidance(options.goal);
+
+    format!(
+        "You are {agent_name}. Use Magellan to produce a compact walkthrough focused on this topic: {topic}
+
+Workflow:
+1. Gather evidence using this source of truth:
+{source_guidance}
+2. Run `magellan schema`.
+3. Optionally run `magellan example --preset walkthrough` for a starter payload.
+4. Create JSON at `{artifact}` with:
+   - `title`
+   - `summary` with 1-2 short paragraphs
+   - `sections` shaped for this goal: {section_guidance}
+   - short `text` arrays instead of long prose
+   - optional `diagram` objects when they clarify the story
+   - optional `verification`
+5. Run `magellan validate --input {artifact}`.
+6. Run `{render_command}`.
+
+Content rules:
+- Explain behavior, flow, or decisions.
+- Do not narrate file churn.
+- Do not invent details that are not grounded in evidence.
+- Keep the walkthrough paced and scannable.
+- Prefer diagrams only when they make the story easier to follow.
+
+Diagram guide:
+- `sequence` for request and interaction flow
+- `flow` for branching logic or state movement
+- `component_graph` for relationships between pieces of the system
+- `timeline` when the order of work or events matters
+- `before_after` when the user-facing change is the key story
+
+Goal for this walkthrough:
+{goal_guidance}
+
+Focus for this walkthrough:
+{focus_guidance}
+
+Good final move:
+`{render_command}`",
+        topic = options.topic,
+        artifact = options.artifact.display(),
+        render_command = render_command,
+        source_guidance = source_guidance,
+        section_guidance = section_guidance,
+        goal_guidance = goal_guidance,
+        focus_guidance = focus_guidance
+    )
 }
 
 fn resolve_render_destination(
@@ -286,56 +429,92 @@ fn write_output(path: Option<&Path>, rendered: &str) -> Result<()> {
     Ok(())
 }
 
-const CODEX_PROMPT: &str = "\
-You are Codex. Use Magellan to produce a compact walkthrough of the work you already inspected.
+fn format_render_command(path: &Path, render_format: OutputFormat) -> String {
+    match render_format {
+        OutputFormat::Html => {
+            format!(
+                "magellan render --input {} --format html --open",
+                path.display()
+            )
+        }
+        OutputFormat::Markdown => {
+            format!(
+                "magellan render --input {} --format markdown",
+                path.display()
+            )
+        }
+        OutputFormat::Terminal => {
+            format!(
+                "magellan render --input {} --format terminal",
+                path.display()
+            )
+        }
+    }
+}
 
-Workflow:
-1. Inspect the relevant code, diff, tests, and session context yourself.
-2. Run `magellan schema`.
-3. Optionally run `magellan example --preset walkthrough` for a starter payload.
-4. Create a JSON payload with:
-   - `title`
-   - `summary` with 1-2 short paragraphs
-   - `sections` with 3-6 focused steps
-   - short `text` arrays instead of long prose
-   - optional `diagram` objects when they clarify the story
-   - optional `verification`
-5. Run `magellan validate --input WALKTHROUGH.json`.
-6. Run `magellan render --input WALKTHROUGH.json --format html --open`.
+fn prompt_focus_guidance(focuses: &[CliPromptFocus]) -> String {
+    if focuses.is_empty() {
+        return String::from("- no explicit focus was requested; choose the clearest story arc");
+    }
 
-Content rules:
-- Explain behavior, flow, or decisions.
-- Do not narrate file churn.
-- Do not invent details that are not grounded in evidence.
-- Keep the walkthrough paced and scannable.
+    focuses
+        .iter()
+        .map(|focus| match focus {
+            CliPromptFocus::Behavior => {
+                "- prioritize what the system now does differently for the user or caller"
+            }
+            CliPromptFocus::Architecture => {
+                "- emphasize which parts of the system collaborate and why"
+            }
+            CliPromptFocus::Timeline => "- emphasize order: what happens first, next, and last",
+            CliPromptFocus::Verification => {
+                "- give verification its own section and be explicit about evidence"
+            }
+            CliPromptFocus::Decisions => {
+                "- call out important implementation or product decisions, not just outcomes"
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
 
-Good final move:
-`magellan render --input /tmp/magellan.json --format html --open`
-";
+fn prompt_source_guidance(source: CliPromptSource) -> &'static str {
+    match source {
+        CliPromptSource::Session => {
+            "- inspect session messages, tool actions, and timestamps to reconstruct intent and sequence"
+        }
+        CliPromptSource::Diff => {
+            "- inspect the current diff or commit range and use it as the main evidence for what changed"
+        }
+        CliPromptSource::Branch => {
+            "- compare the current branch to trunk and use that delta as the main evidence"
+        }
+        CliPromptSource::Pr => {
+            "- inspect the pull request description, review comments, and diff before writing the walkthrough"
+        }
+    }
+}
 
-const CLAUDE_PROMPT: &str = "\
-You are Claude Code. Use Magellan to turn your understanding of the task into a compact walkthrough.
+fn prompt_goal_guidance(goal: CliPromptGoal) -> &'static str {
+    match goal {
+        CliPromptGoal::Walkthrough => {
+            "- produce a broad narrated explainer that tells the full story of the change"
+        }
+        CliPromptGoal::Followup => {
+            "- answer a narrower follow-up question and stay tighter than a full walkthrough"
+        }
+        CliPromptGoal::Handoff => {
+            "- optimize for another engineer picking up the work quickly, including decisions and verification"
+        }
+    }
+}
 
-Workflow:
-1. Inspect the relevant code, diff, tests, and session context yourself.
-2. Run `magellan schema`.
-3. Optionally run `magellan example --preset walkthrough` for a starter payload.
-4. Create a JSON payload with:
-   - `title`
-   - `summary` with 1-2 short paragraphs
-   - `sections` with 3-6 focused steps
-   - short `text` arrays instead of long prose
-   - optional `diagram` objects when they clarify the story
-   - optional `verification`
-5. Run `magellan validate --input WALKTHROUGH.json`.
-6. Run `magellan render --input WALKTHROUGH.json --format html --open`.
-
-Content rules:
-- Explain behavior, flow, or decisions.
-- Do not narrate file churn.
-- Do not invent details that are not grounded in evidence.
-- Keep the walkthrough paced and scannable.
-
-Good final move:
-`magellan render --input /tmp/magellan.json --format html --open`
-";
+fn prompt_goal_section_guidance(goal: CliPromptGoal) -> &'static str {
+    match goal {
+        CliPromptGoal::Walkthrough => "3-6 focused steps that cover the main story arc",
+        CliPromptGoal::Followup => "2-4 focused steps centered on the specific question",
+        CliPromptGoal::Handoff => {
+            "3-6 focused steps, with explicit attention to decisions, risks, and verification"
+        }
+    }
+}

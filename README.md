@@ -8,7 +8,7 @@ It does not call an LLM. Instead, an agent or engineer prepares a structured pay
 
 ```text
 magellan schema
-magellan prompt --agent-type codex
+magellan prompt --agent-type codex --source session --goal walkthrough
 magellan example --preset walkthrough
 magellan validate --input payload.json
 magellan render --input payload.json --format terminal
@@ -20,6 +20,7 @@ magellan render --input payload.json --format html --open
 Use `--input -` to read a JSON payload from stdin.
 Use `magellan example --preset walkthrough` when you want a starter payload to edit.
 Use `magellan prompt --agent-type codex` or `magellan prompt --agent-type claude` when you want Magellan to teach an agent the workflow directly.
+Use `--source` and `--goal` on `magellan prompt` when you want the template to match where the evidence comes from and what artifact the agent should produce.
 
 ## Why This Exists
 
@@ -91,7 +92,8 @@ Run locally with:
 
 ```bash
 cargo run -- schema
-cargo run -- prompt --agent-type codex
+cargo run -- prompt --agent-type codex --source session --goal walkthrough
+cargo run -- prompt --agent-type codex --source diff --goal followup --topic "why did this change?"
 cargo run -- example --preset walkthrough
 cargo run -- validate --input payload.json
 cargo run -- render --input payload.json --format html --out /tmp/magellan.html

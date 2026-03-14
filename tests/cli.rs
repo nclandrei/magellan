@@ -53,7 +53,7 @@ fn help_mentions_prompt_workflow() {
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "magellan prompt --agent-type codex",
+            "magellan prompt --agent-type codex --source diff --goal followup",
         ))
         .stdout(predicate::str::contains("Agent workflow"));
 }
@@ -66,9 +66,107 @@ fn prompt_command_prints_codex_template() {
         .assert()
         .success()
         .stdout(predicate::str::contains("You are Codex."))
+        .stdout(predicate::str::contains(
+            "focused on this topic: what we built in this task",
+        ))
         .stdout(predicate::str::contains("magellan schema"))
         .stdout(predicate::str::contains(
-            "magellan render --input WALKTHROUGH.json --format html --open",
+            "inspect session messages, tool actions, and timestamps",
+        ))
+        .stdout(predicate::str::contains(
+            "produce a broad narrated explainer that tells the full story of the change",
+        ))
+        .stdout(predicate::str::contains(
+            "magellan render --input /tmp/magellan.json --format html --open",
+        ));
+}
+
+#[test]
+fn prompt_help_mentions_source_and_goal_options() {
+    Command::cargo_bin("magellan")
+        .expect("binary should build")
+        .args(["prompt", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--source <SOURCE>"))
+        .stdout(predicate::str::contains("--goal <GOAL>"))
+        .stdout(predicate::str::contains("Goals:"))
+        .stdout(predicate::str::contains("Sources:"));
+}
+
+#[test]
+fn prompt_command_can_customize_topic_source_goal_artifact_and_focus() {
+    Command::cargo_bin("magellan")
+        .expect("binary should build")
+        .args([
+            "prompt",
+            "--agent-type",
+            "claude",
+            "--source",
+            "pr",
+            "--goal",
+            "handoff",
+            "--topic",
+            "what we built in this session",
+            "--artifact",
+            "/tmp/session-walkthrough.json",
+            "--render-format",
+            "markdown",
+            "--focus",
+            "behavior",
+            "--focus",
+            "verification",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "Use Magellan to produce a compact walkthrough focused on this topic: what we built in this session",
+        ))
+        .stdout(predicate::str::contains(
+            "inspect the pull request description, review comments, and diff before writing the walkthrough",
+        ))
+        .stdout(predicate::str::contains(
+            "optimize for another engineer picking up the work quickly, including decisions and verification",
+        ))
+        .stdout(predicate::str::contains(
+            "magellan validate --input /tmp/session-walkthrough.json",
+        ))
+        .stdout(predicate::str::contains(
+            "magellan render --input /tmp/session-walkthrough.json --format markdown",
+        ))
+        .stdout(predicate::str::contains(
+            "- prioritize what the system now does differently for the user or caller",
+        ))
+        .stdout(predicate::str::contains(
+            "- give verification its own section and be explicit about evidence",
+        ));
+}
+
+#[test]
+fn prompt_command_can_target_followup_goal() {
+    Command::cargo_bin("magellan")
+        .expect("binary should build")
+        .args([
+            "prompt",
+            "--agent-type",
+            "codex",
+            "--source",
+            "diff",
+            "--goal",
+            "followup",
+            "--topic",
+            "why did the API validation flow change?",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "inspect the current diff or commit range and use it as the main evidence for what changed",
+        ))
+        .stdout(predicate::str::contains(
+            "answer a narrower follow-up question and stay tighter than a full walkthrough",
+        ))
+        .stdout(predicate::str::contains(
+            "2-4 focused steps centered on the specific question",
         ));
 }
 
