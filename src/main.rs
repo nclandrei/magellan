@@ -30,11 +30,31 @@ Rules:
   - keep paragraph text short
   - use evidence from code, diffs, tests, and session history
 
+Fast paths:
+  Learn the payload contract:
+    magellan schema
+  Start from a built-in preset:
+    magellan example --preset timeline
+  Study a realistic fixture:
+    magellan render --input examples/session-walkthrough.json --format html --open
+
+Diagram picking cheat sheet:
+  sequence         Request or actor-by-actor interaction flow
+  flow             Branching logic or state movement
+  component_graph  Steady-state relationships between modules or layers
+  timeline         Ordered work, debugging steps, or event progression
+  before_after     User-visible behavior change
+
 Agent-specific prompt templates:
   magellan prompt --agent-type codex
   magellan prompt --agent-type claude --source session --goal walkthrough
   magellan prompt --agent-type codex --source diff --goal followup --question \"why did this flow change?\"
   magellan prompt --agent-type codex --source branch --goal handoff --scope backend --scope tests --focus verification --focus decisions
+
+Checked-in reference payloads:
+  examples/session-walkthrough.json
+  examples/branch-handoff-timeline.json
+  examples/followup-validation-question.json
 
 Use `--input -` to read JSON from stdin.";
 
@@ -53,7 +73,75 @@ Sources:
   session      Use session messages, tool actions, and timestamps.
   diff         Use the active diff or commit range as the main evidence.
   branch       Compare the current branch to trunk.
-  pr           Use pull request description, comments, and diff.";
+  pr           Use pull request description, comments, and diff.
+
+Diagram picking:
+  sequence         Request or actor-by-actor interaction flow
+  flow             Branching logic or state movement
+  component_graph  Steady-state relationships between modules or layers
+  timeline         Ordered work, debugging steps, or event progression
+  before_after     User-visible behavior change
+
+Reference outputs:
+  examples/session-walkthrough.json
+  examples/branch-handoff-timeline.json
+  examples/followup-validation-question.json";
+
+const SCHEMA_AFTER_HELP: &str = "\
+Use this when an agent needs the exact payload contract before writing JSON.
+
+Typical flow:
+  magellan schema > /tmp/magellan-schema.json
+  magellan example --preset walkthrough > /tmp/magellan.json
+  magellan validate --input /tmp/magellan.json
+
+Payload shape reminders:
+  - `title`
+  - `summary` with 1-2 short paragraphs
+  - `sections` with 3-6 focused chunks
+  - optional `verification`";
+
+const EXAMPLE_AFTER_HELP: &str = "\
+Starter presets:
+  walkthrough   Broad narrated explainer with request-flow emphasis
+  timeline      Ordered story when sequence of work matters
+  before_after  Behavior comparison when the change is best shown side by side
+
+Checked-in realistic references:
+  examples/session-walkthrough.json
+  examples/branch-handoff-timeline.json
+  examples/followup-validation-question.json";
+
+const VALIDATE_AFTER_HELP: &str = "\
+Validate before rendering.
+
+Examples:
+  magellan validate --input /tmp/magellan.json
+  magellan validate --input examples/session-walkthrough.json
+  cat payload.json | magellan validate --input -
+
+Validation checks pacing and diagram structure. It does not verify factual truth.";
+
+const RENDER_AFTER_HELP: &str = "\
+Format guide:
+  terminal  Fast in-chat or terminal explanation with ASCII diagrams
+  markdown  Good for chat messages, docs, or PR comments with Mermaid blocks
+  html      Best for paced visual walkthroughs and report-style reading
+
+Diagram guide:
+  sequence         Request or actor-by-actor interaction flow
+  flow             Branching logic or state movement
+  component_graph  Steady-state relationships between modules or layers
+  timeline         Ordered work, debugging steps, or event progression
+  before_after     User-visible behavior change
+
+Examples:
+  magellan render --input examples/session-walkthrough.json --format terminal
+  magellan render --input examples/branch-handoff-timeline.json --format markdown
+  magellan render --input examples/followup-validation-question.json --format html --open
+  cat payload.json | magellan render --input - --format html --open
+
+`--open` requires `--format html`.";
 
 #[derive(Parser, Debug)]
 #[command(
@@ -70,6 +158,7 @@ struct Cli {
 #[derive(Subcommand, Debug)]
 enum Command {
     /// Print the JSON Schema for Magellan's input payload.
+    #[command(after_help = SCHEMA_AFTER_HELP)]
     Schema,
     /// Print an agent-oriented prompt template for producing a Magellan walkthrough.
     #[command(after_help = PROMPT_AFTER_HELP)]
@@ -103,18 +192,21 @@ enum Command {
         focus: Vec<CliPromptFocus>,
     },
     /// Print a starter payload that agents can edit before rendering.
+    #[command(after_help = EXAMPLE_AFTER_HELP)]
     Example {
         /// Which starter payload to print.
         #[arg(long, default_value = "walkthrough")]
         preset: CliExamplePreset,
     },
     /// Validate a JSON payload without rendering it.
+    #[command(after_help = VALIDATE_AFTER_HELP)]
     Validate {
         /// JSON file to load, or '-' to read from stdin.
         #[arg(long)]
         input: PathBuf,
     },
     /// Render a JSON payload into terminal, markdown, or HTML output.
+    #[command(after_help = RENDER_AFTER_HELP)]
     Render {
         /// JSON file to load, or '-' to read from stdin.
         #[arg(long)]
@@ -151,7 +243,7 @@ enum CliAgentType {
     Claude,
 }
 
-#[derive(Clone, Copy, Debug, ValueEnum)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
 enum CliPromptFocus {
     Behavior,
     Architecture,
@@ -168,7 +260,7 @@ enum CliPromptSource {
     Pr,
 }
 
-#[derive(Clone, Copy, Debug, ValueEnum)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
 enum CliPromptGoal {
     Walkthrough,
     Followup,
@@ -291,6 +383,7 @@ fn prompt_text(options: PromptOptions<'_>) -> String {
     let section_guidance = prompt_goal_section_guidance(options.goal);
     let question_guidance = prompt_question_guidance(options.question);
     let scope_guidance = prompt_scope_guidance(options.scope);
+    let diagram_guidance = prompt_diagram_guidance(options.goal, options.focus);
 
     format!(
         "You are {agent_name}. Use Magellan to produce a compact walkthrough focused on this topic: {effective_topic}
@@ -317,12 +410,8 @@ Content rules:
 - Keep the walkthrough paced and scannable.
 - Prefer diagrams only when they make the story easier to follow.
 
-Diagram guide:
-- `sequence` for request and interaction flow
-- `flow` for branching logic or state movement
-- `component_graph` for relationships between pieces of the system
-- `timeline` when the order of work or events matters
-- `before_after` when the user-facing change is the key story
+Diagram selection:
+{diagram_guidance}
 
 Goal for this walkthrough:
 {goal_guidance}
@@ -346,7 +435,8 @@ Good final move:
         goal_guidance = goal_guidance,
         question_guidance = question_guidance,
         scope_guidance = scope_guidance,
-        focus_guidance = focus_guidance
+        focus_guidance = focus_guidance,
+        diagram_guidance = diagram_guidance
     )
 }
 
@@ -570,4 +660,45 @@ fn prompt_scope_guidance(scopes: &[String]) -> String {
         .map(|scope| format!("- keep the walkthrough centered on this scope: {scope}"))
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+fn prompt_diagram_guidance(goal: CliPromptGoal, focuses: &[CliPromptFocus]) -> String {
+    let mut guidance = vec![
+        String::from(
+            "- use `sequence` when readers need to follow actors or request flow step by step",
+        ),
+        String::from("- use `flow` for branching logic, validation gates, or state movement"),
+        String::from(
+            "- use `component_graph` for steady-state relationships between modules, layers, or services",
+        ),
+        String::from(
+            "- use `timeline` when the order of work or events is part of the explanation",
+        ),
+        String::from(
+            "- use `before_after` when the main point is how behavior changed for the user or caller",
+        ),
+        String::from(
+            "- prefer at most one diagram per section and skip diagrams when a short paragraph is clearer",
+        ),
+    ];
+
+    if goal == CliPromptGoal::Handoff || focuses.contains(&CliPromptFocus::Timeline) {
+        guidance.push(String::from(
+            "- for this artifact, include a `timeline` section when implementation order helps the reader pick up the work",
+        ));
+    }
+
+    if focuses.contains(&CliPromptFocus::Architecture) {
+        guidance.push(String::from(
+            "- architecture-focused explanations usually benefit from a `component_graph` section",
+        ));
+    }
+
+    if focuses.contains(&CliPromptFocus::Behavior) {
+        guidance.push(String::from(
+            "- behavior-focused explanations usually benefit from `sequence`, `flow`, or `before_after`, depending on the story",
+        ));
+    }
+
+    guidance.join("\n")
 }

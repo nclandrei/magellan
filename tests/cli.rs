@@ -52,6 +52,11 @@ fn help_mentions_prompt_workflow() {
         .arg("--help")
         .assert()
         .success()
+        .stdout(predicate::str::contains("Fast paths:"))
+        .stdout(predicate::str::contains("Diagram picking cheat sheet:"))
+        .stdout(predicate::str::contains(
+            "examples/session-walkthrough.json",
+        ))
         .stdout(predicate::str::contains(
             "magellan prompt --agent-type codex --source branch --goal handoff --scope backend --scope tests",
         ))
@@ -93,7 +98,81 @@ fn prompt_help_mentions_source_and_goal_options() {
         .stdout(predicate::str::contains("--question <QUESTION>"))
         .stdout(predicate::str::contains("--scope <SCOPE>"))
         .stdout(predicate::str::contains("Goals:"))
-        .stdout(predicate::str::contains("Sources:"));
+        .stdout(predicate::str::contains("Sources:"))
+        .stdout(predicate::str::contains("Diagram picking:"))
+        .stdout(predicate::str::contains(
+            "timeline         Ordered work, debugging steps, or event progression",
+        ))
+        .stdout(predicate::str::contains(
+            "examples/branch-handoff-timeline.json",
+        ));
+}
+
+#[test]
+fn schema_help_explains_the_contract_workflow() {
+    Command::cargo_bin("magellan")
+        .expect("binary should build")
+        .args(["schema", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "Use this when an agent needs the exact payload contract before writing JSON.",
+        ))
+        .stdout(predicate::str::contains(
+            "magellan schema > /tmp/magellan-schema.json",
+        ))
+        .stdout(predicate::str::contains(
+            "summary` with 1-2 short paragraphs",
+        ));
+}
+
+#[test]
+fn example_help_points_to_presets_and_realistic_references() {
+    Command::cargo_bin("magellan")
+        .expect("binary should build")
+        .args(["example", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Starter presets:"))
+        .stdout(predicate::str::contains(
+            "timeline      Ordered story when sequence of work matters",
+        ))
+        .stdout(predicate::str::contains(
+            "examples/followup-validation-question.json",
+        ));
+}
+
+#[test]
+fn validate_help_explains_the_pipeline() {
+    Command::cargo_bin("magellan")
+        .expect("binary should build")
+        .args(["validate", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Validate before rendering."))
+        .stdout(predicate::str::contains(
+            "magellan validate --input examples/session-walkthrough.json",
+        ))
+        .stdout(predicate::str::contains(
+            "Validation checks pacing and diagram structure.",
+        ));
+}
+
+#[test]
+fn render_help_explains_formats_and_diagram_types() {
+    Command::cargo_bin("magellan")
+        .expect("binary should build")
+        .args(["render", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Format guide:"))
+        .stdout(predicate::str::contains(
+            "timeline         Ordered work, debugging steps, or event progression",
+        ))
+        .stdout(predicate::str::contains(
+            "magellan render --input examples/followup-validation-question.json --format html --open",
+        ))
+        .stdout(predicate::str::contains("`--open` requires `--format html`."));
 }
 
 #[test]
@@ -175,6 +254,12 @@ fn prompt_command_can_target_followup_goal() {
         ))
         .stdout(predicate::str::contains(
             "make sure the walkthrough answers this explicitly near the top: why did the API validation flow change?",
+        ))
+        .stdout(predicate::str::contains(
+            "use `flow` for branching logic, validation gates, or state movement",
+        ))
+        .stdout(predicate::str::contains(
+            "use `before_after` when the main point is how behavior changed for the user or caller",
         ));
 }
 
@@ -217,6 +302,33 @@ fn prompt_command_can_constrain_scope() {
         ))
         .stdout(predicate::str::contains(
             "keep the walkthrough centered on this scope: tests",
+        ));
+}
+
+#[test]
+fn prompt_command_with_handoff_and_timeline_focus_recommends_timeline_sections() {
+    Command::cargo_bin("magellan")
+        .expect("binary should build")
+        .args([
+            "prompt",
+            "--agent-type",
+            "codex",
+            "--source",
+            "branch",
+            "--goal",
+            "handoff",
+            "--focus",
+            "timeline",
+            "--focus",
+            "architecture",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "for this artifact, include a `timeline` section when implementation order helps the reader pick up the work",
+        ))
+        .stdout(predicate::str::contains(
+            "architecture-focused explanations usually benefit from a `component_graph` section",
         ));
 }
 

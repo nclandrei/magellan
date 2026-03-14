@@ -89,3 +89,43 @@ fn prompt_scope_flow_works_end_to_end_with_real_binary() {
     assert!(prompt.contains("magellan validate --input /tmp/scope-flow.json"));
     assert!(prompt.contains("optimize for another engineer picking up the work quickly"));
 }
+
+#[test]
+fn prompt_handoff_flow_recommends_timeline_and_component_graph_end_to_end() {
+    let temp_dir = tempfile::tempdir().expect("temp dir should be created");
+    let prompt_path = temp_dir.path().join("handoff-prompt.txt");
+
+    let output = Command::cargo_bin("magellan")
+        .expect("binary should build")
+        .args([
+            "prompt",
+            "--agent-type",
+            "codex",
+            "--source",
+            "branch",
+            "--goal",
+            "handoff",
+            "--focus",
+            "timeline",
+            "--focus",
+            "architecture",
+            "--artifact",
+            "/tmp/handoff-flow.json",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    fs::write(&prompt_path, &output).expect("prompt output should be saved");
+    let prompt = fs::read_to_string(&prompt_path).expect("prompt output should be readable");
+
+    assert!(prompt.contains(
+        "for this artifact, include a `timeline` section when implementation order helps the reader pick up the work"
+    ));
+    assert!(prompt.contains(
+        "architecture-focused explanations usually benefit from a `component_graph` section"
+    ));
+    assert!(prompt.contains("magellan render --input /tmp/handoff-flow.json --format html --open"));
+}

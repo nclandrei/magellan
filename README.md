@@ -20,6 +20,7 @@ magellan render --input payload.json --format html --open
 Use `--input -` to read a JSON payload from stdin.
 Use `magellan example --preset walkthrough` when you want a starter payload to edit.
 Use `magellan prompt --agent-type codex` or `magellan prompt --agent-type claude` when you want Magellan to teach an agent the workflow directly.
+Use `magellan <command> --help` when you want workflow-oriented guidance for that exact step, not just flags.
 Use `--source` and `--goal` on `magellan prompt` when you want the template to match where the evidence comes from and what artifact the agent should produce.
 Use `--question` when the walkthrough should answer a specific question directly instead of only expanding a topic.
 Use `--scope` when the walkthrough should stay inside a specific subsystem, layer, route, or flow.

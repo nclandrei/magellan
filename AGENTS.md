@@ -22,6 +22,7 @@ Magellan is a deterministic presentation engine. It does not inspect a repositor
 - Prefer deterministic rendering over smart inference.
 - Optimize for short, paced walkthroughs rather than exhaustive prose.
 - Explain behavior and flow, not file churn.
+- Keep `--help` outputs instructional for agents: each command should teach the workflow, not only list flags.
 - Add tests whenever changing schema rules, CLI behavior, or renderers.
 
 ## Development Commands
