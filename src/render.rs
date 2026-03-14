@@ -200,6 +200,8 @@ fn render_html(document: &Document) -> String {
         {verification_html}
       </div>
     </section>
+
+    {diagram_modal_html}
   </main>
   <script>{script}</script>
 </body>
@@ -211,6 +213,7 @@ fn render_html(document: &Document) -> String {
         verification_html = verification_html,
         book_pages_html = book_pages_html,
         page_dots_html = page_dots_html,
+        diagram_modal_html = render_diagram_modal_shell(),
         style = html_style(),
         script = html_script()
     )
@@ -303,7 +306,7 @@ fn render_section_page(index: usize, total_pages: usize, section: &Section) -> S
         .map(|diagram| {
             format!(
                 "<div class=\"page-visual\">{}</div>",
-                render_diagram_html(index, diagram)
+                render_diagram_html(index, diagram, true)
             )
         })
         .unwrap_or_default();
@@ -401,7 +404,7 @@ fn render_overview_section_html(index: usize, section: &Section) -> String {
     let diagram_html = section
         .diagram
         .as_ref()
-        .map(|diagram| render_diagram_html(index, diagram))
+        .map(|diagram| render_diagram_html(index, diagram, false))
         .unwrap_or_default();
 
     format!(
@@ -410,6 +413,22 @@ fn render_overview_section_html(index: usize, section: &Section) -> String {
         paragraphs_to_html(&section.text),
         diagram_html
     )
+}
+
+fn render_diagram_modal_shell() -> &'static str {
+    r#"<div class="diagram-modal" data-diagram-modal hidden>
+      <button class="diagram-modal-backdrop" type="button" data-diagram-close aria-label="Close expanded diagram"></button>
+      <div class="diagram-modal-card" role="dialog" aria-modal="true" aria-labelledby="diagram-modal-title">
+        <div class="diagram-modal-header">
+          <div>
+            <p class="eyebrow">Expanded diagram</p>
+            <h2 class="diagram-modal-title" id="diagram-modal-title" data-diagram-modal-title>Diagram</h2>
+          </div>
+          <button class="nav-button diagram-modal-close" type="button" data-diagram-close>Close</button>
+        </div>
+        <div class="diagram-modal-body" data-diagram-modal-body></div>
+      </div>
+    </div>"#
 }
 
 fn html_style() -> &'static str {
@@ -438,6 +457,9 @@ fn html_style() -> &'static str {
         radial-gradient(circle at top left, rgba(15, 118, 110, 0.18), transparent 30%),
         linear-gradient(160deg, #f8f3eb 0%, #ece3d3 100%);
       color: var(--ink);
+    }
+    body[data-diagram-modal-open="true"] {
+      overflow: hidden;
     }
     .report-shell {
       max-width: 1120px;
@@ -734,6 +756,16 @@ fn html_style() -> &'static str {
       background: linear-gradient(180deg, rgba(248, 250, 252, 0.96) 0%, rgba(241, 245, 249, 0.94) 100%);
       padding: 18px;
     }
+    .diagram-expandable .diagram-hitbox {
+      display: block;
+      width: 100%;
+      border: 0;
+      padding: 0;
+      background: transparent;
+      text-align: left;
+      color: inherit;
+      cursor: zoom-in;
+    }
     .diagram-label {
       margin: 0 0 12px;
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -743,10 +775,84 @@ fn html_style() -> &'static str {
       text-transform: uppercase;
       color: var(--accent);
     }
+    .diagram-stage {
+      display: block;
+    }
     .diagram svg {
       display: block;
       width: 100%;
       height: auto;
+    }
+    .diagram-hint {
+      display: block;
+      margin-top: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--accent);
+    }
+    .diagram-modal[hidden] {
+      display: none;
+    }
+    .diagram-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+    }
+    .diagram-modal-backdrop {
+      position: absolute;
+      inset: 0;
+      border: 0;
+      padding: 0;
+      background: rgba(28, 25, 23, 0.54);
+      backdrop-filter: blur(6px);
+      cursor: pointer;
+    }
+    .diagram-modal-card {
+      position: relative;
+      z-index: 1;
+      width: min(1240px, calc(100vw - 24px));
+      max-height: calc(100vh - 24px);
+      overflow: auto;
+      border-radius: 28px;
+      border: 1px solid rgba(15, 118, 110, 0.16);
+      background: var(--paper-strong);
+      box-shadow: 0 28px 70px rgba(28, 25, 23, 0.28);
+      padding: 24px;
+    }
+    .diagram-modal-header {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .diagram-modal-title {
+      margin-bottom: 0;
+    }
+    .diagram-modal-body {
+      margin-top: 18px;
+    }
+    .diagram-modal-figure {
+      border-radius: 20px;
+      border: 1px solid rgba(15, 118, 110, 0.16);
+      background: linear-gradient(180deg, rgba(248, 250, 252, 0.98) 0%, rgba(241, 245, 249, 0.96) 100%);
+      padding: 18px;
+    }
+    .diagram-modal-figure svg {
+      display: block;
+      width: 100%;
+      height: auto;
+      max-height: calc(100vh - 220px);
+    }
+    .diagram-modal-note {
+      margin-top: 14px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.82rem;
+      color: var(--accent);
     }
     details {
       margin-top: 16px;
@@ -817,6 +923,14 @@ fn html_style() -> &'static str {
         flex: 1;
         text-align: center;
       }
+      .diagram-modal {
+        padding: 10px;
+      }
+      .diagram-modal-card {
+        width: calc(100vw - 20px);
+        max-height: calc(100vh - 20px);
+        padding: 18px;
+      }
     }
     "#
 }
@@ -839,8 +953,14 @@ fn html_script() -> &'static str {
       const next = root.querySelector('[data-next-page]');
       const pageLabel = root.querySelector('[data-current-page-label]');
       const pageCounter = root.querySelector('[data-page-counter]');
+      const modal = root.querySelector('[data-diagram-modal]');
+      const modalBody = root.querySelector('[data-diagram-modal-body]');
+      const modalTitle = root.querySelector('[data-diagram-modal-title]');
+      const modalCloseButtons = Array.from(root.querySelectorAll('[data-diagram-close]'));
+      const diagramTriggers = Array.from(root.querySelectorAll('[data-diagram-trigger]'));
 
       const state = { view: 'book', page: 0 };
+      let lastTrigger = null;
 
       function setView(view) {
         state.view = view;
@@ -881,8 +1001,38 @@ fn html_script() -> &'static str {
         }
       }
 
+      function openDiagram(trigger) {
+        if (!modal || !modalBody || !modalTitle) return;
+        const templateId = trigger.dataset.diagramTemplateId;
+        if (!templateId) return;
+        const template = root.querySelector(`#${templateId}`);
+        if (!(template instanceof HTMLTemplateElement)) return;
+
+        modalTitle.textContent = trigger.dataset.diagramTitle || 'Diagram';
+        modalBody.innerHTML = template.innerHTML;
+        modal.hidden = false;
+        document.body.setAttribute('data-diagram-modal-open', 'true');
+        lastTrigger = trigger;
+      }
+
+      function closeDiagram() {
+        if (!modal || modal.hidden) return;
+        modal.hidden = true;
+        if (modalBody) modalBody.innerHTML = '';
+        document.body.removeAttribute('data-diagram-modal-open');
+        if (lastTrigger instanceof HTMLElement) {
+          lastTrigger.focus();
+        }
+      }
+
       toggles.forEach((button) => {
         button.addEventListener('click', () => setView(button.dataset.viewTarget || 'book'));
+      });
+      diagramTriggers.forEach((trigger) => {
+        trigger.addEventListener('click', () => openDiagram(trigger));
+      });
+      modalCloseButtons.forEach((button) => {
+        button.addEventListener('click', closeDiagram);
       });
       dots.forEach((dot, index) => {
         dot.addEventListener('click', () => {
@@ -893,6 +1043,11 @@ fn html_script() -> &'static str {
       if (prev) prev.addEventListener('click', () => setPage(state.page - 1));
       if (next) next.addEventListener('click', () => setPage(state.page + 1));
       window.addEventListener('keydown', (event) => {
+        if (modal && !modal.hidden && event.key === 'Escape') {
+          closeDiagram();
+          return;
+        }
+        if (modal && !modal.hidden) return;
         if (state.view !== 'book') return;
         if (event.key === 'ArrowRight') setPage(state.page + 1);
         if (event.key === 'ArrowLeft') setPage(state.page - 1);
@@ -904,15 +1059,39 @@ fn html_script() -> &'static str {
     "#
 }
 
-fn render_diagram_html(index: usize, diagram: &Diagram) -> String {
+fn render_diagram_html(index: usize, diagram: &Diagram, expandable: bool) -> String {
     let svg = render_svg_diagram(index, diagram);
     let ascii = escape_html(&render_ascii_diagram(diagram));
+    let title = diagram_title(diagram);
+
+    if expandable {
+        let template_id = format!("diagram-template-{index}");
+        let modal_svg = render_svg_diagram(index + 10_000, diagram);
+
+        return format!(
+            "<div class=\"diagram diagram-expandable\">
+              <button class=\"diagram-hitbox\" type=\"button\" data-diagram-trigger data-diagram-template-id=\"{template_id}\" data-diagram-title=\"{title}\" aria-label=\"Expand {title}\">
+                <span class=\"diagram-label\">{title}</span>
+                <span class=\"diagram-stage\">{svg}</span>
+                <span class=\"diagram-hint\">Click to enlarge</span>
+              </button>
+              <details><summary>ASCII fallback</summary><pre>{ascii}</pre></details>
+              <template id=\"{template_id}\">
+                <div class=\"diagram-modal-figure\">{modal_svg}</div>
+                <p class=\"diagram-modal-note\">Press Escape or click outside the diagram to close.</p>
+              </template>
+            </div>",
+            template_id = template_id,
+            title = title,
+            svg = svg,
+            ascii = ascii,
+            modal_svg = modal_svg
+        );
+    }
 
     format!(
         "<div class=\"diagram\"><p class=\"diagram-label\">{}</p>{}<details><summary>ASCII fallback</summary><pre>{}</pre></details></div>",
-        diagram_title(diagram),
-        svg,
-        ascii
+        title, svg, ascii
     )
 }
 
@@ -1649,6 +1828,9 @@ mod tests {
         assert!(rendered.contains("data-view=\"overview\" hidden"));
         assert!(rendered.contains("data-book-track"));
         assert!(rendered.contains("Page 1 / 3"));
+        assert!(rendered.contains("data-diagram-modal"));
+        assert!(rendered.contains("data-diagram-trigger"));
+        assert!(rendered.contains("Click to enlarge"));
         assert!(rendered.contains("<link rel=\"icon\" href=\"data:,\">"));
         assert!(rendered.contains("<svg viewBox="));
         assert!(rendered.contains("ASCII fallback"));

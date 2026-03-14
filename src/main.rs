@@ -127,7 +127,7 @@ const RENDER_AFTER_HELP: &str = "\
 Format guide:
   terminal  Fast in-chat or terminal explanation with ASCII diagrams
   markdown  Good for chat messages, docs, or PR comments with Mermaid blocks
-  html      Best for paced visual walkthroughs; opens in book view with an overview toggle
+  html      Best for paced visual walkthroughs; opens in book view with an overview toggle and clickable expandable diagrams
 
 Diagram guide:
   sequence         Request or actor-by-actor interaction flow
@@ -142,7 +142,7 @@ Examples:
   magellan render --input examples/followup-validation-question.json --format html --open
   cat payload.json | magellan render --input - --format html --open
 
-HTML reports now default to a page-by-page book layout. Use the built-in Overview switch inside the report when you want the whole walkthrough at once.
+HTML reports now default to a page-by-page book layout. Use the built-in Overview switch inside the report when you want the whole walkthrough at once, and click book-mode diagrams to enlarge them.
 
 `--open` requires `--format html`.";
 

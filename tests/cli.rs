@@ -181,6 +181,9 @@ fn render_help_explains_formats_and_diagram_types() {
         .stdout(predicate::str::contains(
             "HTML reports now default to a page-by-page book layout.",
         ))
+        .stdout(predicate::str::contains(
+            "click book-mode diagrams to enlarge them",
+        ))
         .stdout(predicate::str::contains("`--open` requires `--format html`."));
 }
 
@@ -392,6 +395,9 @@ fn render_command_can_write_html_to_a_file() {
     assert!(rendered.contains("Book View"));
     assert!(rendered.contains("Overview"));
     assert!(rendered.contains("data-book-track"));
+    assert!(rendered.contains("data-diagram-modal"));
+    assert!(rendered.contains("data-diagram-trigger"));
+    assert!(rendered.contains("Click to enlarge"));
     assert!(!rendered.contains("cdn.jsdelivr"));
 }
 

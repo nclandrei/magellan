@@ -80,10 +80,11 @@ The source of truth is `magellan schema`, but the payload looks like this at a h
 
 - `terminal`: compact text with ASCII diagrams
 - `markdown`: sectioned Markdown with Mermaid blocks
-- `html`: a styled local report with self-contained inline diagrams, a page-by-page book view, and an overview toggle
+- `html`: a styled local report with self-contained inline diagrams, a page-by-page book view, an overview toggle, and clickable enlarged diagrams in book mode
 
 When you pass `--open` with `--format html`, Magellan writes the report and opens it in the default browser. If `--out` is omitted, Magellan creates a temp file automatically.
 In HTML, the summary becomes the opening page and each section becomes its own page, so the agent should keep one idea per section.
+In book view, clicking a diagram opens a larger modal so the technical detail is readable without leaving the current page.
 
 ## Example Reports
 

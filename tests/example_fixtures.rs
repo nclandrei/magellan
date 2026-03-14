@@ -40,6 +40,7 @@ fn fixture_cases() -> [FixtureCase; 3] {
                 "Sequence diagram",
                 "Flow diagram",
                 "Component diagram",
+                "Click to enlarge",
             ],
         },
         FixtureCase {
@@ -64,6 +65,7 @@ fn fixture_cases() -> [FixtureCase; 3] {
                 "Timeline",
                 "Flow diagram",
                 "Verification",
+                "Click to enlarge",
             ],
         },
         FixtureCase {
@@ -83,6 +85,7 @@ fn fixture_cases() -> [FixtureCase; 3] {
                 "Flow diagram",
                 "Before / after",
                 "ASCII fallback",
+                "Click to enlarge",
             ],
         },
     ]
@@ -202,6 +205,11 @@ fn checked_in_fixtures_render_expected_html_output() {
             "html render for {} should include the overview view",
             case.path
         );
+        assert!(
+            html.contains("data-diagram-modal"),
+            "html render for {} should include the diagram modal shell",
+            case.path
+        );
     }
 }
 
@@ -222,8 +230,18 @@ fn session_fixture_html_includes_expected_book_paging_structure() {
     let html = fs::read_to_string(&output_path).expect("html output should be readable");
     let page_count = html.matches("data-page-title=").count();
     let dot_count = html.matches("data-page-dot=").count();
+    let trigger_count = html.matches("class=\"diagram-hitbox\"").count();
+    let template_count = html.matches("<template id=\"diagram-template-").count();
 
     assert_eq!(page_count, 5, "summary + 3 sections + verification");
     assert_eq!(dot_count, 5, "book navigation should mirror the page count");
+    assert_eq!(
+        trigger_count, 3,
+        "book view should expose one trigger per section diagram"
+    );
+    assert_eq!(
+        template_count, 3,
+        "book view should include one modal template per section diagram"
+    );
     assert!(html.contains("Book view shows one technical slice at a time."));
 }
