@@ -13,6 +13,7 @@ magellan validate --input payload.json
 magellan render --input payload.json --format terminal
 magellan render --input payload.json --format markdown
 magellan render --input payload.json --format html --out /tmp/magellan.html
+magellan render --input payload.json --format html --open
 ```
 
 Use `--input -` to read a JSON payload from stdin.
@@ -73,6 +74,8 @@ The source of truth is `magellan schema`, but the payload looks like this at a h
 - `markdown`: sectioned Markdown with Mermaid blocks
 - `html`: a styled local report with Mermaid diagrams and ASCII fallbacks
 
+When you pass `--open` with `--format html`, Magellan writes the report and opens it in the default browser. If `--out` is omitted, Magellan creates a temp file automatically.
+
 ## Development
 
 Build and verify with:
@@ -89,6 +92,7 @@ cargo run -- schema
 cargo run -- example --preset walkthrough
 cargo run -- validate --input payload.json
 cargo run -- render --input payload.json --format html --out /tmp/magellan.html
+cargo run -- render --input payload.json --format html --open
 ```
 
 ## Design Boundary

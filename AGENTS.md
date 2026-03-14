@@ -41,6 +41,7 @@ cargo run -- validate --input payload.json
 cargo run -- render --input payload.json --format terminal
 cargo run -- render --input payload.json --format markdown
 cargo run -- render --input payload.json --format html --out /tmp/magellan.html
+cargo run -- render --input payload.json --format html --open
 ```
 
 Use `--input -` when piping JSON from another tool or agent.
@@ -60,6 +61,7 @@ The current scaffold supports:
 - built-in starter payloads for agents
 - payload validation
 - deterministic rendering for `terminal`, `markdown`, and `html`
+- optional browser opening for rendered HTML reports
 
 Likely next steps:
 

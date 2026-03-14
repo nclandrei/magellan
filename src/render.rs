@@ -164,6 +164,7 @@ fn render_html(document: &Document) -> String {
   <meta charset=\"utf-8\">
   <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
   <title>{title}</title>
+  <link rel=\"icon\" href=\"data:,\">
   <style>
     :root {{
       color-scheme: light;
@@ -529,6 +530,7 @@ mod tests {
         assert!(rendered.contains("<!DOCTYPE html>"));
         assert!(rendered.contains("Magellan walkthrough"));
         assert!(rendered.contains("cdn.jsdelivr.net/npm/mermaid@11"));
+        assert!(rendered.contains("<link rel=\"icon\" href=\"data:,\">"));
         assert!(rendered.contains("<pre class=\"mermaid\">sequenceDiagram"));
         assert!(rendered.contains("ASCII fallback"));
     }
