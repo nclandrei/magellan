@@ -1,0 +1,81 @@
+{
+  "title": "Handoff: search results hydration cleanup across the branch",
+  "summary": [
+    "This branch cleaned up the search results experience in a few deliberate steps instead of one opaque rewrite.",
+    "The important story for handoff is the order of the work: request normalization first, loading-state cleanup second, and stale-result protection last."
+  ],
+  "sections": [
+    {
+      "title": "Timeline of the change",
+      "text": [
+        "The branch started by stabilizing the request shape, then moved to UI state cleanup, and finished by locking down stale result handling.",
+        "That order matters because each step removed ambiguity for the next one rather than stacking multiple behavioral changes at once."
+      ],
+      "diagram": {
+        "type": "timeline",
+        "events": [
+          {
+            "label": "Step 1",
+            "detail": "Normalize search params before the request leaves the route loader."
+          },
+          {
+            "label": "Step 2",
+            "detail": "Collapse duplicate loading indicators into a single visible state."
+          },
+          {
+            "label": "Step 3",
+            "detail": "Ignore stale responses when a newer query has already started."
+          },
+          {
+            "label": "Step 4",
+            "detail": "Add a regression test for fast repeated searches."
+          }
+        ]
+      }
+    },
+    {
+      "title": "Steady-state flow after the cleanup",
+      "text": [
+        "The route loader now owns request shaping, and the results view only reacts to the latest accepted response.",
+        "That gives the next engineer a cleaner mental model: one normalized request in, one current result set out."
+      ],
+      "diagram": {
+        "type": "flow",
+        "nodes": [
+          "Route Loader",
+          "Query Normalizer",
+          "Search API",
+          "Current Result Store",
+          "Results View"
+        ],
+        "edges": [
+          {
+            "from": "Route Loader",
+            "to": "Query Normalizer",
+            "label": "prepare query"
+          },
+          {
+            "from": "Query Normalizer",
+            "to": "Search API",
+            "label": "normalized request"
+          },
+          {
+            "from": "Search API",
+            "to": "Current Result Store",
+            "label": "latest response"
+          },
+          {
+            "from": "Current Result Store",
+            "to": "Results View",
+            "label": "render current state"
+          }
+        ]
+      }
+    }
+  ],
+  "verification": {
+    "text": [
+      "Manual searches with rapid input changes stayed stable, and the added regression test now covers stale-result rendering."
+    ]
+  }
+}

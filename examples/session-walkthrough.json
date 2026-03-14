@@ -1,0 +1,125 @@
+{
+  "title": "Session walkthrough: checkout validation moved in front of order submission",
+  "summary": [
+    "This session moved checkout validation earlier in the flow so missing address and payment data now fail before the order request is built.",
+    "The main behavior change is that invalid carts stay on the page with focused inline errors, while valid carts still follow the same backend path as before."
+  ],
+  "sections": [
+    {
+      "title": "How the request flow changed",
+      "text": [
+        "The checkout page now sends the submit intent through a validation gate before the order payload is assembled.",
+        "Only validated carts continue to the orders API, which keeps the backend contract stable while shifting obvious failures closer to the user."
+      ],
+      "diagram": {
+        "type": "sequence",
+        "nodes": [
+          "User",
+          "Checkout Page",
+          "Validation Gate",
+          "Orders API"
+        ],
+        "edges": [
+          {
+            "from": "User",
+            "to": "Checkout Page",
+            "label": "tap place order"
+          },
+          {
+            "from": "Checkout Page",
+            "to": "Validation Gate",
+            "label": "check cart"
+          },
+          {
+            "from": "Validation Gate",
+            "to": "Checkout Page",
+            "label": "inline errors"
+          },
+          {
+            "from": "Validation Gate",
+            "to": "Orders API",
+            "label": "valid payload"
+          }
+        ]
+      }
+    },
+    {
+      "title": "What happens on valid and invalid input now",
+      "text": [
+        "Invalid submissions stop locally and point the user at the exact field that needs attention instead of waiting for a round-trip failure.",
+        "Valid submissions still proceed through the normal order creation path, so the behavior change is mostly about earlier feedback and cleaner rejection handling."
+      ],
+      "diagram": {
+        "type": "flow",
+        "nodes": [
+          "Invalid cart data",
+          "Inline field errors",
+          "Valid cart data",
+          "Orders API"
+        ],
+        "edges": [
+          {
+            "from": "Invalid cart data",
+            "to": "Inline field errors",
+            "label": "stop locally"
+          },
+          {
+            "from": "Valid cart data",
+            "to": "Orders API",
+            "label": "continue"
+          }
+        ]
+      }
+    },
+    {
+      "title": "Which parts of the system now own the behavior",
+      "text": [
+        "The checkout page still owns the submit action, but the validators now gate what can reach the submit controller.",
+        "That separation makes the UI feedback path explicit without changing the downstream API responsibilities."
+      ],
+      "diagram": {
+        "type": "component_graph",
+        "nodes": [
+          "Checkout Page",
+          "Address Validator",
+          "Payment Validator",
+          "Submit Controller",
+          "Orders API"
+        ],
+        "edges": [
+          {
+            "from": "Checkout Page",
+            "to": "Address Validator",
+            "label": "address fields"
+          },
+          {
+            "from": "Checkout Page",
+            "to": "Payment Validator",
+            "label": "payment fields"
+          },
+          {
+            "from": "Address Validator",
+            "to": "Submit Controller",
+            "label": "validated cart"
+          },
+          {
+            "from": "Payment Validator",
+            "to": "Submit Controller",
+            "label": "validated cart"
+          },
+          {
+            "from": "Submit Controller",
+            "to": "Orders API",
+            "label": "create order"
+          }
+        ]
+      }
+    }
+  ],
+  "verification": {
+    "text": [
+      "The invalid-submission regression is covered by an automated checkout test that asserts field-level errors appear before any network request is sent.",
+      "A manual browser pass confirmed that valid carts still place orders successfully after the validation gate was introduced."
+    ]
+  }
+}

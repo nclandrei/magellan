@@ -1,0 +1,73 @@
+{
+  "title": "Follow-up: why the retry guard moved into the background worker",
+  "summary": [
+    "The retry guard moved from the API handler into the background worker so duplicate retry logic now lives next to the queue state it depends on.",
+    "That makes the follow-up story narrower: the system still retries failed work, but the decision is now made where attempt counts and backoff data are already available."
+  ],
+  "sections": [
+    {
+      "title": "Why the worker owns retries now",
+      "text": [
+        "The worker already has the attempt count, last failure detail, and backoff timing in memory when it picks up a job.",
+        "Moving the guard there avoids re-deriving retry state in the API path and keeps enqueueing lightweight."
+      ],
+      "diagram": {
+        "type": "flow",
+        "nodes": [
+          "API Handler",
+          "Job Queue",
+          "Background Worker",
+          "Retry Guard",
+          "External Service"
+        ],
+        "edges": [
+          {
+            "from": "API Handler",
+            "to": "Job Queue",
+            "label": "enqueue job"
+          },
+          {
+            "from": "Job Queue",
+            "to": "Background Worker",
+            "label": "claim job"
+          },
+          {
+            "from": "Background Worker",
+            "to": "Retry Guard",
+            "label": "attempt metadata"
+          },
+          {
+            "from": "Retry Guard",
+            "to": "External Service",
+            "label": "retry if allowed"
+          }
+        ]
+      }
+    },
+    {
+      "title": "Before and after the move",
+      "text": [
+        "Before the change, the API handler needed enough context to guess whether a retry should happen.",
+        "After the change, the handler only enqueues work and the worker makes the retry decision with better local context."
+      ],
+      "diagram": {
+        "type": "before_after",
+        "before": [
+          "API handler checks retry eligibility before enqueueing",
+          "Retry state is reconstructed from partial request context",
+          "Worker executes the job after an earlier decision"
+        ],
+        "after": [
+          "API handler enqueues the job immediately",
+          "Worker reads attempt count and backoff state from the queue record",
+          "Retry guard decides locally before the external call"
+        ]
+      }
+    }
+  ],
+  "verification": {
+    "text": [
+      "A worker-focused test now covers max-attempt handling, and a manual replay of a failed job confirmed that retries stop at the expected boundary."
+    ]
+  }
+}
