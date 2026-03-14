@@ -46,6 +46,33 @@ fn schema_command_prints_a_document_schema() {
 }
 
 #[test]
+fn help_mentions_prompt_workflow() {
+    Command::cargo_bin("magellan")
+        .expect("binary should build")
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "magellan prompt --agent-type codex",
+        ))
+        .stdout(predicate::str::contains("Agent workflow"));
+}
+
+#[test]
+fn prompt_command_prints_codex_template() {
+    Command::cargo_bin("magellan")
+        .expect("binary should build")
+        .args(["prompt", "--agent-type", "codex"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("You are Codex."))
+        .stdout(predicate::str::contains("magellan schema"))
+        .stdout(predicate::str::contains(
+            "magellan render --input WALKTHROUGH.json --format html --open",
+        ));
+}
+
+#[test]
 fn validate_command_accepts_a_valid_payload() {
     let temp_dir = tempfile::tempdir().expect("temp dir should be created");
     let input_path = temp_dir.path().join("payload.json");

@@ -14,15 +14,25 @@ use magellan::{
 const AFTER_HELP: &str = "\
 Magellan is a deterministic presentation engine for AI-generated walkthroughs.
 
-Give it structured content, not long prose blobs:
-  - title
-  - 1-2 short summary paragraphs
-  - 3-6 sections with short paragraphs
-  - optional diagrams when they improve comprehension
+Agent workflow:
+  1. Inspect the code, diff, tests, and session yourself.
+  2. Run `magellan schema` and optionally `magellan example --preset walkthrough`.
+  3. Create a JSON payload with short summaries, short sections, and optional diagrams.
+  4. Validate it with `magellan validate --input WALKTHROUGH.json`.
+  5. Render it with `magellan render --input WALKTHROUGH.json --format html --open`.
 
-Use `magellan schema` to inspect the expected JSON payload.
-Use `magellan example --preset walkthrough` when you want a starter payload.
-Pass `--input -` to read JSON from stdin.";
+Rules:
+  - explain behavior, not file churn
+  - keep the summary to 1-2 short paragraphs
+  - keep sections to 3-6 focused chunks
+  - keep paragraph text short
+  - use evidence from code, diffs, tests, and session history
+
+Agent-specific prompt templates:
+  magellan prompt --agent-type codex
+  magellan prompt --agent-type claude
+
+Use `--input -` to read JSON from stdin.";
 
 #[derive(Parser, Debug)]
 #[command(
@@ -40,6 +50,12 @@ struct Cli {
 enum Command {
     /// Print the JSON Schema for Magellan's input payload.
     Schema,
+    /// Print an agent-oriented prompt template for producing a Magellan walkthrough.
+    Prompt {
+        /// Which coding agent the prompt should be tailored for.
+        #[arg(long)]
+        agent_type: CliAgentType,
+    },
     /// Print a starter payload that agents can edit before rendering.
     Example {
         /// Which starter payload to print.
@@ -83,6 +99,12 @@ enum CliExamplePreset {
     BeforeAfter,
 }
 
+#[derive(Clone, Copy, Debug, ValueEnum)]
+enum CliAgentType {
+    Codex,
+    Claude,
+}
+
 impl From<CliOutputFormat> for OutputFormat {
     fn from(value: CliOutputFormat) -> Self {
         match value {
@@ -109,6 +131,9 @@ fn main() -> Result<()> {
     match cli.command {
         Command::Schema => {
             println!("{}", schema_json()?);
+        }
+        Command::Prompt { agent_type } => {
+            println!("{}", prompt_text(agent_type));
         }
         Command::Example { preset } => {
             let document = example_document(preset.into());
@@ -145,6 +170,13 @@ fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn prompt_text(agent_type: CliAgentType) -> &'static str {
+    match agent_type {
+        CliAgentType::Codex => CODEX_PROMPT,
+        CliAgentType::Claude => CLAUDE_PROMPT,
+    }
 }
 
 fn resolve_render_destination(
@@ -253,3 +285,57 @@ fn write_output(path: Option<&Path>, rendered: &str) -> Result<()> {
 
     Ok(())
 }
+
+const CODEX_PROMPT: &str = "\
+You are Codex. Use Magellan to produce a compact walkthrough of the work you already inspected.
+
+Workflow:
+1. Inspect the relevant code, diff, tests, and session context yourself.
+2. Run `magellan schema`.
+3. Optionally run `magellan example --preset walkthrough` for a starter payload.
+4. Create a JSON payload with:
+   - `title`
+   - `summary` with 1-2 short paragraphs
+   - `sections` with 3-6 focused steps
+   - short `text` arrays instead of long prose
+   - optional `diagram` objects when they clarify the story
+   - optional `verification`
+5. Run `magellan validate --input WALKTHROUGH.json`.
+6. Run `magellan render --input WALKTHROUGH.json --format html --open`.
+
+Content rules:
+- Explain behavior, flow, or decisions.
+- Do not narrate file churn.
+- Do not invent details that are not grounded in evidence.
+- Keep the walkthrough paced and scannable.
+
+Good final move:
+`magellan render --input /tmp/magellan.json --format html --open`
+";
+
+const CLAUDE_PROMPT: &str = "\
+You are Claude Code. Use Magellan to turn your understanding of the task into a compact walkthrough.
+
+Workflow:
+1. Inspect the relevant code, diff, tests, and session context yourself.
+2. Run `magellan schema`.
+3. Optionally run `magellan example --preset walkthrough` for a starter payload.
+4. Create a JSON payload with:
+   - `title`
+   - `summary` with 1-2 short paragraphs
+   - `sections` with 3-6 focused steps
+   - short `text` arrays instead of long prose
+   - optional `diagram` objects when they clarify the story
+   - optional `verification`
+5. Run `magellan validate --input WALKTHROUGH.json`.
+6. Run `magellan render --input WALKTHROUGH.json --format html --open`.
+
+Content rules:
+- Explain behavior, flow, or decisions.
+- Do not narrate file churn.
+- Do not invent details that are not grounded in evidence.
+- Keep the walkthrough paced and scannable.
+
+Good final move:
+`magellan render --input /tmp/magellan.json --format html --open`
+";

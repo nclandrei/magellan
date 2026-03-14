@@ -36,6 +36,7 @@ Useful manual checks:
 
 ```bash
 cargo run -- schema
+cargo run -- prompt --agent-type codex
 cargo run -- example --preset walkthrough
 cargo run -- validate --input payload.json
 cargo run -- render --input payload.json --format terminal
@@ -58,6 +59,7 @@ Use `--input -` when piping JSON from another tool or agent.
 The current scaffold supports:
 
 - JSON Schema generation
+- agent-oriented prompt templates
 - built-in starter payloads for agents
 - payload validation
 - deterministic rendering for `terminal`, `markdown`, and `html`
