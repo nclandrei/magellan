@@ -22,6 +22,7 @@ Use `magellan example --preset walkthrough` when you want a starter payload to e
 Use `magellan prompt --agent-type codex` or `magellan prompt --agent-type claude` when you want Magellan to teach an agent the workflow directly.
 Use `--source` and `--goal` on `magellan prompt` when you want the template to match where the evidence comes from and what artifact the agent should produce.
 Use `--question` when the walkthrough should answer a specific question directly instead of only expanding a topic.
+Use `--scope` when the walkthrough should stay inside a specific subsystem, layer, route, or flow.
 
 ## Why This Exists
 
@@ -95,6 +96,7 @@ Run locally with:
 cargo run -- schema
 cargo run -- prompt --agent-type codex --source session --goal walkthrough
 cargo run -- prompt --agent-type codex --source diff --goal followup --question "why did this change?"
+cargo run -- prompt --agent-type claude --source branch --goal handoff --scope backend --scope tests
 cargo run -- example --preset walkthrough
 cargo run -- validate --input payload.json
 cargo run -- render --input payload.json --format html --out /tmp/magellan.html

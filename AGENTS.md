@@ -38,7 +38,7 @@ Useful manual checks:
 cargo run -- schema
 cargo run -- prompt --agent-type codex --source session --goal walkthrough
 cargo run -- prompt --agent-type codex --source diff --goal followup --question "why did this flow change?"
-cargo run -- prompt --agent-type claude --source branch --goal handoff --artifact /tmp/handoff.json
+cargo run -- prompt --agent-type claude --source branch --goal handoff --scope backend --scope tests --artifact /tmp/handoff.json
 cargo run -- example --preset walkthrough
 cargo run -- validate --input payload.json
 cargo run -- render --input payload.json --format terminal
@@ -64,6 +64,7 @@ The current scaffold supports:
 - agent-oriented prompt templates
 - prompt templates that adapt to evidence source and artifact goal
 - prompt templates that can target an explicit question
+- prompt templates that can constrain scope to a subsystem or flow
 - built-in starter payloads for agents
 - payload validation
 - deterministic rendering for `terminal`, `markdown`, and `html`

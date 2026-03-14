@@ -53,7 +53,7 @@ fn help_mentions_prompt_workflow() {
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "magellan prompt --agent-type codex --source diff --goal followup --question",
+            "magellan prompt --agent-type codex --source branch --goal handoff --scope backend --scope tests",
         ))
         .stdout(predicate::str::contains("Agent workflow"));
 }
@@ -91,6 +91,7 @@ fn prompt_help_mentions_source_and_goal_options() {
         .stdout(predicate::str::contains("--source <SOURCE>"))
         .stdout(predicate::str::contains("--goal <GOAL>"))
         .stdout(predicate::str::contains("--question <QUESTION>"))
+        .stdout(predicate::str::contains("--scope <SCOPE>"))
         .stdout(predicate::str::contains("Goals:"))
         .stdout(predicate::str::contains("Sources:"));
 }
@@ -186,6 +187,36 @@ fn prompt_command_without_question_mentions_inferred_framing() {
         .success()
         .stdout(predicate::str::contains(
             "no explicit question was provided; infer the most useful framing from the topic and goal",
+        ));
+}
+
+#[test]
+fn prompt_command_can_constrain_scope() {
+    Command::cargo_bin("magellan")
+        .expect("binary should build")
+        .args([
+            "prompt",
+            "--agent-type",
+            "claude",
+            "--source",
+            "branch",
+            "--goal",
+            "handoff",
+            "--scope",
+            "backend",
+            "--scope",
+            "tests",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "no explicit question was provided; infer the most useful framing from the topic and goal",
+        ))
+        .stdout(predicate::str::contains(
+            "keep the walkthrough centered on this scope: backend",
+        ))
+        .stdout(predicate::str::contains(
+            "keep the walkthrough centered on this scope: tests",
         ));
 }
 

@@ -52,3 +52,40 @@ fn prompt_help_examples_include_question_flow() {
         ))
         .stdout(predicate::str::contains("followup"));
 }
+
+#[test]
+fn prompt_scope_flow_works_end_to_end_with_real_binary() {
+    let temp_dir = tempfile::tempdir().expect("temp dir should be created");
+    let prompt_path = temp_dir.path().join("scope-prompt.txt");
+
+    let output = Command::cargo_bin("magellan")
+        .expect("binary should build")
+        .args([
+            "prompt",
+            "--agent-type",
+            "claude",
+            "--source",
+            "branch",
+            "--goal",
+            "handoff",
+            "--scope",
+            "backend",
+            "--scope",
+            "tests",
+            "--artifact",
+            "/tmp/scope-flow.json",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    fs::write(&prompt_path, &output).expect("prompt output should be saved");
+    let prompt = fs::read_to_string(&prompt_path).expect("prompt output should be readable");
+
+    assert!(prompt.contains("keep the walkthrough centered on this scope: backend"));
+    assert!(prompt.contains("keep the walkthrough centered on this scope: tests"));
+    assert!(prompt.contains("magellan validate --input /tmp/scope-flow.json"));
+    assert!(prompt.contains("optimize for another engineer picking up the work quickly"));
+}

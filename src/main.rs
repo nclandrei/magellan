@@ -34,7 +34,7 @@ Agent-specific prompt templates:
   magellan prompt --agent-type codex
   magellan prompt --agent-type claude --source session --goal walkthrough
   magellan prompt --agent-type codex --source diff --goal followup --question \"why did this flow change?\"
-  magellan prompt --agent-type codex --source branch --goal handoff --focus verification --focus decisions
+  magellan prompt --agent-type codex --source branch --goal handoff --scope backend --scope tests --focus verification --focus decisions
 
 Use `--input -` to read JSON from stdin.";
 
@@ -42,7 +42,7 @@ const PROMPT_AFTER_HELP: &str = "\
 Examples:
   magellan prompt --agent-type codex --source session --goal walkthrough --topic \"what we built in this session\"
   magellan prompt --agent-type claude --source diff --goal followup --question \"why did this API flow change?\"
-  magellan prompt --agent-type codex --source pr --goal handoff --artifact /tmp/handoff.json --focus verification --focus decisions
+  magellan prompt --agent-type codex --source pr --goal handoff --scope backend --scope tests --artifact /tmp/handoff.json --focus verification --focus decisions
 
 Goals:
   walkthrough  Create a broad narrated explainer of the change.
@@ -89,6 +89,9 @@ enum Command {
         /// A specific question the walkthrough must answer directly.
         #[arg(long)]
         question: Option<String>,
+        /// Limit the walkthrough to specific parts of the system or flow. Repeat to provide multiple scopes.
+        #[arg(long)]
+        scope: Vec<String>,
         /// Where the agent should write the payload JSON before rendering it.
         #[arg(long, default_value = "/tmp/magellan.json")]
         artifact: PathBuf,
@@ -205,6 +208,7 @@ fn main() -> Result<()> {
             goal,
             topic,
             question,
+            scope,
             artifact,
             render_format,
             focus,
@@ -215,6 +219,7 @@ fn main() -> Result<()> {
                 goal,
                 topic: topic.as_str(),
                 question: question.as_deref(),
+                scope: &scope,
                 artifact: artifact.as_path(),
                 render_format: render_format.into(),
                 focus: &focus,
@@ -264,6 +269,7 @@ struct PromptOptions<'a> {
     goal: CliPromptGoal,
     topic: &'a str,
     question: Option<&'a str>,
+    scope: &'a [String],
     artifact: &'a Path,
     render_format: OutputFormat,
     focus: &'a [CliPromptFocus],
@@ -284,6 +290,7 @@ fn prompt_text(options: PromptOptions<'_>) -> String {
     let goal_guidance = prompt_goal_guidance(options.goal);
     let section_guidance = prompt_goal_section_guidance(options.goal);
     let question_guidance = prompt_question_guidance(options.question);
+    let scope_guidance = prompt_scope_guidance(options.scope);
 
     format!(
         "You are {agent_name}. Use Magellan to produce a compact walkthrough focused on this topic: {effective_topic}
@@ -323,6 +330,9 @@ Goal for this walkthrough:
 Specific question to answer:
 {question_guidance}
 
+Scope for this walkthrough:
+{scope_guidance}
+
 Focus for this walkthrough:
 {focus_guidance}
 
@@ -335,6 +345,7 @@ Good final move:
         section_guidance = section_guidance,
         goal_guidance = goal_guidance,
         question_guidance = question_guidance,
+        scope_guidance = scope_guidance,
         focus_guidance = focus_guidance
     )
 }
@@ -545,4 +556,18 @@ fn prompt_question_guidance(question: Option<&str>) -> String {
             "- no explicit question was provided; infer the most useful framing from the topic and goal",
         ),
     }
+}
+
+fn prompt_scope_guidance(scopes: &[String]) -> String {
+    if scopes.is_empty() {
+        return String::from(
+            "- no explicit scope was provided; use the full relevant surface implied by the source and goal",
+        );
+    }
+
+    scopes
+        .iter()
+        .map(|scope| format!("- keep the walkthrough centered on this scope: {scope}"))
+        .collect::<Vec<_>>()
+        .join("\n")
 }
