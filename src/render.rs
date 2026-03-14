@@ -1224,7 +1224,7 @@ fn render_graph_svg(id: &str, title: &str, nodes: &[String], edges: &[Edge]) -> 
     let padding = 28;
     let gap_x = 54;
     let gap_y = 68;
-    let rows = ((nodes.len() + columns - 1) / columns).max(1);
+    let rows = nodes.len().div_ceil(columns).max(1);
     let width =
         padding * 2 + columns as i32 * box_width + (columns.saturating_sub(1)) as i32 * gap_x;
     let height = padding * 2 + rows as i32 * box_height + (rows.saturating_sub(1)) as i32 * gap_y;
