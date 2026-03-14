@@ -53,7 +53,7 @@ fn help_mentions_prompt_workflow() {
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "magellan prompt --agent-type codex --source diff --goal followup",
+            "magellan prompt --agent-type codex --source diff --goal followup --question",
         ))
         .stdout(predicate::str::contains("Agent workflow"));
 }
@@ -90,6 +90,7 @@ fn prompt_help_mentions_source_and_goal_options() {
         .success()
         .stdout(predicate::str::contains("--source <SOURCE>"))
         .stdout(predicate::str::contains("--goal <GOAL>"))
+        .stdout(predicate::str::contains("--question <QUESTION>"))
         .stdout(predicate::str::contains("Goals:"))
         .stdout(predicate::str::contains("Sources:"));
 }
@@ -154,11 +155,14 @@ fn prompt_command_can_target_followup_goal() {
             "diff",
             "--goal",
             "followup",
-            "--topic",
+            "--question",
             "why did the API validation flow change?",
         ])
         .assert()
         .success()
+        .stdout(predicate::str::contains(
+            "focused on this topic: why did the API validation flow change?",
+        ))
         .stdout(predicate::str::contains(
             "inspect the current diff or commit range and use it as the main evidence for what changed",
         ))
@@ -167,6 +171,21 @@ fn prompt_command_can_target_followup_goal() {
         ))
         .stdout(predicate::str::contains(
             "2-4 focused steps centered on the specific question",
+        ))
+        .stdout(predicate::str::contains(
+            "make sure the walkthrough answers this explicitly near the top: why did the API validation flow change?",
+        ));
+}
+
+#[test]
+fn prompt_command_without_question_mentions_inferred_framing() {
+    Command::cargo_bin("magellan")
+        .expect("binary should build")
+        .args(["prompt", "--agent-type", "codex"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "no explicit question was provided; infer the most useful framing from the topic and goal",
         ));
 }
 

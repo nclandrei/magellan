@@ -11,6 +11,8 @@ use magellan::{
     Document, ExamplePreset, OutputFormat, example_document, render_document, schema_json,
 };
 
+const DEFAULT_TOPIC: &str = "what we built in this task";
+
 const AFTER_HELP: &str = "\
 Magellan is a deterministic presentation engine for AI-generated walkthroughs.
 
@@ -31,7 +33,7 @@ Rules:
 Agent-specific prompt templates:
   magellan prompt --agent-type codex
   magellan prompt --agent-type claude --source session --goal walkthrough
-  magellan prompt --agent-type codex --source diff --goal followup --topic \"why did this flow change?\"
+  magellan prompt --agent-type codex --source diff --goal followup --question \"why did this flow change?\"
   magellan prompt --agent-type codex --source branch --goal handoff --focus verification --focus decisions
 
 Use `--input -` to read JSON from stdin.";
@@ -39,7 +41,7 @@ Use `--input -` to read JSON from stdin.";
 const PROMPT_AFTER_HELP: &str = "\
 Examples:
   magellan prompt --agent-type codex --source session --goal walkthrough --topic \"what we built in this session\"
-  magellan prompt --agent-type claude --source diff --goal followup --topic \"why did this API flow change?\"
+  magellan prompt --agent-type claude --source diff --goal followup --question \"why did this API flow change?\"
   magellan prompt --agent-type codex --source pr --goal handoff --artifact /tmp/handoff.json --focus verification --focus decisions
 
 Goals:
@@ -82,8 +84,11 @@ enum Command {
         #[arg(long, default_value = "walkthrough")]
         goal: CliPromptGoal,
         /// What the walkthrough should explain.
-        #[arg(long, default_value = "what we built in this task")]
+        #[arg(long, default_value = DEFAULT_TOPIC)]
         topic: String,
+        /// A specific question the walkthrough must answer directly.
+        #[arg(long)]
+        question: Option<String>,
         /// Where the agent should write the payload JSON before rendering it.
         #[arg(long, default_value = "/tmp/magellan.json")]
         artifact: PathBuf,
@@ -199,6 +204,7 @@ fn main() -> Result<()> {
             source,
             goal,
             topic,
+            question,
             artifact,
             render_format,
             focus,
@@ -208,6 +214,7 @@ fn main() -> Result<()> {
                 source,
                 goal,
                 topic: topic.as_str(),
+                question: question.as_deref(),
                 artifact: artifact.as_path(),
                 render_format: render_format.into(),
                 focus: &focus,
@@ -256,6 +263,7 @@ struct PromptOptions<'a> {
     source: CliPromptSource,
     goal: CliPromptGoal,
     topic: &'a str,
+    question: Option<&'a str>,
     artifact: &'a Path,
     render_format: OutputFormat,
     focus: &'a [CliPromptFocus],
@@ -266,14 +274,19 @@ fn prompt_text(options: PromptOptions<'_>) -> String {
         CliAgentType::Codex => "Codex",
         CliAgentType::Claude => "Claude Code",
     };
+    let effective_topic = match (options.topic, options.question) {
+        (DEFAULT_TOPIC, Some(question)) => question,
+        (topic, _) => topic,
+    };
     let render_command = format_render_command(options.artifact, options.render_format);
     let focus_guidance = prompt_focus_guidance(options.focus);
     let source_guidance = prompt_source_guidance(options.source);
     let goal_guidance = prompt_goal_guidance(options.goal);
     let section_guidance = prompt_goal_section_guidance(options.goal);
+    let question_guidance = prompt_question_guidance(options.question);
 
     format!(
-        "You are {agent_name}. Use Magellan to produce a compact walkthrough focused on this topic: {topic}
+        "You are {agent_name}. Use Magellan to produce a compact walkthrough focused on this topic: {effective_topic}
 
 Workflow:
 1. Gather evidence using this source of truth:
@@ -307,17 +320,21 @@ Diagram guide:
 Goal for this walkthrough:
 {goal_guidance}
 
+Specific question to answer:
+{question_guidance}
+
 Focus for this walkthrough:
 {focus_guidance}
 
 Good final move:
 `{render_command}`",
-        topic = options.topic,
+        effective_topic = effective_topic,
         artifact = options.artifact.display(),
         render_command = render_command,
         source_guidance = source_guidance,
         section_guidance = section_guidance,
         goal_guidance = goal_guidance,
+        question_guidance = question_guidance,
         focus_guidance = focus_guidance
     )
 }
@@ -516,5 +533,16 @@ fn prompt_goal_section_guidance(goal: CliPromptGoal) -> &'static str {
         CliPromptGoal::Handoff => {
             "3-6 focused steps, with explicit attention to decisions, risks, and verification"
         }
+    }
+}
+
+fn prompt_question_guidance(question: Option<&str>) -> String {
+    match question {
+        Some(question) => {
+            format!("- make sure the walkthrough answers this explicitly near the top: {question}")
+        }
+        None => String::from(
+            "- no explicit question was provided; infer the most useful framing from the topic and goal",
+        ),
     }
 }
