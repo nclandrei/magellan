@@ -23,6 +23,7 @@ Magellan is a deterministic presentation engine. It does not inspect a repositor
 - Optimize for short, paced walkthroughs rather than exhaustive prose.
 - Explain behavior and flow, not file churn.
 - Keep `--help` outputs instructional for agents: each command should teach the workflow, not only list flags.
+- Keep `help.txt` aligned with the real CLI. Top-level `--help` should point agents to `magellan guide`, which prints that checked-in file.
 - Remember that HTML now defaults to book view: one summary page, then one page per section, with an overview toggle in the same report.
 - Book-mode diagrams are expandable, so they should stay technically dense enough to merit the larger modal view.
 - Add tests whenever changing schema rules, CLI behavior, or renderers.
@@ -40,6 +41,7 @@ Useful manual checks:
 
 ```bash
 cargo run -- schema
+cargo run -- guide
 cargo run -- prompt --agent-type codex --source session --goal walkthrough
 cargo run -- prompt --agent-type codex --source diff --goal followup --question "why did this flow change?"
 cargo run -- prompt --agent-type claude --source branch --goal handoff --scope backend --scope tests --artifact /tmp/handoff.json

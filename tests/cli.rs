@@ -53,6 +53,8 @@ fn help_mentions_prompt_workflow() {
         .assert()
         .success()
         .stdout(predicate::str::contains("Fast paths:"))
+        .stdout(predicate::str::contains("Read the full agent playbook:"))
+        .stdout(predicate::str::contains("magellan guide"))
         .stdout(predicate::str::contains("Diagram picking cheat sheet:"))
         .stdout(predicate::str::contains(
             "in HTML, each section becomes a page in book view",
@@ -63,7 +65,26 @@ fn help_mentions_prompt_workflow() {
         .stdout(predicate::str::contains(
             "magellan prompt --agent-type codex --source branch --goal handoff --scope backend --scope tests",
         ))
+        .stdout(predicate::str::contains(
+            "`magellan guide` prints the checked-in `help.txt`",
+        ))
         .stdout(predicate::str::contains("Agent workflow"));
+}
+
+#[test]
+fn guide_command_prints_checked_in_agent_playbook() {
+    Command::cargo_bin("magellan")
+        .expect("binary should build")
+        .arg("guide")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Magellan agent help"))
+        .stdout(predicate::str::contains("Normal workflow"))
+        .stdout(predicate::str::contains("Diagram picking"))
+        .stdout(predicate::str::contains("Book view:"))
+        .stdout(predicate::str::contains(
+            "magellan prompt --agent-type codex",
+        ));
 }
 
 #[test]
@@ -109,6 +130,8 @@ fn prompt_help_mentions_source_and_goal_options() {
         .stdout(predicate::str::contains(
             "timeline         Ordered work, debugging steps, or event progression",
         ))
+        .stdout(predicate::str::contains("Need the longer agent playbook:"))
+        .stdout(predicate::str::contains("magellan guide"))
         .stdout(predicate::str::contains(
             "examples/branch-handoff-timeline.json",
         ));

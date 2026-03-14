@@ -12,6 +12,7 @@ use magellan::{
 };
 
 const DEFAULT_TOPIC: &str = "what we built in this task";
+const AGENT_GUIDE: &str = include_str!("../help.txt");
 
 const AFTER_HELP: &str = "\
 Magellan is a deterministic presentation engine for AI-generated walkthroughs.
@@ -34,6 +35,8 @@ Rules:
 Fast paths:
   Learn the payload contract:
     magellan schema
+  Read the full agent playbook:
+    magellan guide
   Start from a built-in preset:
     magellan example --preset timeline
   Study a realistic fixture:
@@ -56,6 +59,9 @@ Checked-in reference payloads:
   examples/session-walkthrough.json
   examples/branch-handoff-timeline.json
   examples/followup-validation-question.json
+
+Full agent playbook:
+  `magellan guide` prints the checked-in `help.txt` so an agent can discover it from `--help` and read it directly after install.
 
 Use `--input -` to read JSON from stdin.";
 
@@ -86,7 +92,10 @@ Diagram picking:
 Reference outputs:
   examples/session-walkthrough.json
   examples/branch-handoff-timeline.json
-  examples/followup-validation-question.json";
+  examples/followup-validation-question.json
+
+Need the longer agent playbook:
+  magellan guide";
 
 const SCHEMA_AFTER_HELP: &str = "\
 Use this when an agent needs the exact payload contract before writing JSON.
@@ -160,6 +169,8 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Command {
+    /// Print the checked-in agent playbook that Magellan points to from --help.
+    Guide,
     /// Print the JSON Schema for Magellan's input payload.
     #[command(after_help = SCHEMA_AFTER_HELP)]
     Schema,
@@ -294,6 +305,9 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
+        Command::Guide => {
+            print!("{AGENT_GUIDE}");
+        }
         Command::Schema => {
             println!("{}", schema_json()?);
         }

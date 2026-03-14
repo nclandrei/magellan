@@ -1,0 +1,133 @@
+Magellan agent help
+===================
+
+Magellan is a deterministic presentation engine for technical walkthroughs.
+
+Magellan does not inspect a repository by itself and it does not call an LLM.
+An agent or engineer gathers evidence, writes a structured JSON payload, and
+then uses Magellan to validate and render that payload.
+
+Use Magellan when you need to explain what changed without dumping a wall of
+text. The output should stay technical, paced, and visual.
+
+Core rule
+---------
+
+Explain behavior, flow, architecture, timeline, or verification.
+Do not narrate file churn.
+
+Normal workflow
+---------------
+
+1. Decide what evidence you are using.
+   - session messages, tool actions, and timestamps
+   - current diff or commit range
+   - branch compared to trunk
+   - pull request description, comments, and diff
+
+2. Learn the payload contract.
+   - run: `magellan schema`
+   - optional starter payload: `magellan example --preset walkthrough`
+
+3. Write a JSON payload.
+   Required fields:
+   - `title`
+   - `summary`
+   - `sections`
+
+   Optional fields:
+   - `verification`
+
+4. Validate the payload.
+   - run: `magellan validate --input /tmp/magellan.json`
+
+5. Render the final artifact.
+   - terminal: `magellan render --input /tmp/magellan.json --format terminal`
+   - markdown: `magellan render --input /tmp/magellan.json --format markdown`
+   - html: `magellan render --input /tmp/magellan.json --format html --open`
+
+Content rules
+-------------
+
+- Keep the summary to 1-2 short paragraphs.
+- Keep sections to 3-6 focused chunks.
+- Keep section text short.
+- In HTML, each section becomes a page in book view.
+- In book view, diagrams can be clicked to enlarge.
+- Use diagrams only when they make the technical explanation easier to follow.
+- Ground the content in real evidence from code, diffs, tests, and session history.
+
+Diagram picking
+---------------
+
+- `sequence`: request or actor-by-actor interaction flow
+- `flow`: branching logic or state movement
+- `component_graph`: steady-state relationships between modules or layers
+- `timeline`: ordered work, debugging steps, or event progression
+- `before_after`: user-visible behavior change
+
+Prompt workflow
+---------------
+
+Use `magellan prompt` when you want Magellan to teach the agent how to build
+the payload.
+
+Examples:
+- `magellan prompt --agent-type codex`
+- `magellan prompt --agent-type codex --source session --goal walkthrough`
+- `magellan prompt --agent-type codex --source diff --goal followup --question "why did this flow change?"`
+- `magellan prompt --agent-type claude --source branch --goal handoff --scope backend --scope tests --focus verification --focus decisions`
+
+Prompt knobs:
+- `--source`: where the evidence comes from
+- `--goal`: broad walkthrough, follow-up answer, or engineer handoff
+- `--question`: a narrow question to answer directly
+- `--scope`: keep the artifact inside a subsystem, route, or flow
+- `--focus`: emphasize behavior, architecture, timeline, verification, or decisions
+
+Render targets
+--------------
+
+- `terminal` is best for in-chat or terminal output
+- `markdown` is best for chat messages, docs, or PR comments
+- `html` is best for a paced visual walkthrough
+
+HTML behavior
+-------------
+
+HTML reports are self-contained and open in book view by default.
+
+Book view:
+- starts with the summary
+- shows one technical slice per page
+- supports page navigation
+- lets the user click diagrams to enlarge them
+
+Overview view:
+- shows the full walkthrough as one stacked report
+
+Reference files
+---------------
+
+Use these checked-in payloads when you want realistic examples:
+- `examples/session-walkthrough.json`
+- `examples/branch-handoff-timeline.json`
+- `examples/followup-validation-question.json`
+
+Fast paths
+----------
+
+Learn the contract:
+- `magellan schema`
+
+Start from a built-in preset:
+- `magellan example --preset timeline`
+
+Study a realistic HTML report:
+- `magellan render --input examples/session-walkthrough.json --format html --open`
+
+Answer a focused follow-up:
+- `magellan prompt --agent-type codex --source diff --goal followup --question "why did this API flow change?"`
+
+Prepare a handoff:
+- `magellan prompt --agent-type claude --source branch --goal handoff --scope backend --scope tests`
