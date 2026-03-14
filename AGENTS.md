@@ -61,6 +61,7 @@ The current scaffold supports:
 - built-in starter payloads for agents
 - payload validation
 - deterministic rendering for `terminal`, `markdown`, and `html`
+- self-contained HTML reports with inline diagrams
 - optional browser opening for rendered HTML reports
 
 Likely next steps:

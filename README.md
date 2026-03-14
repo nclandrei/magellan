@@ -72,7 +72,7 @@ The source of truth is `magellan schema`, but the payload looks like this at a h
 
 - `terminal`: compact text with ASCII diagrams
 - `markdown`: sectioned Markdown with Mermaid blocks
-- `html`: a styled local report with Mermaid diagrams and ASCII fallbacks
+- `html`: a styled local report with self-contained inline diagrams and ASCII fallbacks
 
 When you pass `--open` with `--format html`, Magellan writes the report and opens it in the default browser. If `--out` is omitted, Magellan creates a temp file automatically.
 

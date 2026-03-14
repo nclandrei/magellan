@@ -92,7 +92,8 @@ fn render_command_can_write_html_to_a_file() {
     let rendered = fs::read_to_string(&output_path).expect("rendered html should be readable");
     assert!(rendered.contains("<!DOCTYPE html>"));
     assert!(rendered.contains("Order validation moved earlier"));
-    assert!(rendered.contains("mermaid"));
+    assert!(rendered.contains("<svg viewBox="));
+    assert!(!rendered.contains("cdn.jsdelivr"));
 }
 
 #[test]
