@@ -23,6 +23,7 @@ Magellan is a deterministic presentation engine. It does not inspect a repositor
 - Optimize for short, paced walkthroughs rather than exhaustive prose.
 - Explain behavior and flow, not file churn.
 - Keep `--help` outputs instructional for agents: each command should teach the workflow, not only list flags.
+- Remember that HTML now defaults to book view: one summary page, then one page per section, with an overview toggle in the same report.
 - Add tests whenever changing schema rules, CLI behavior, or renderers.
 
 ## Development Commands

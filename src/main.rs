@@ -28,6 +28,7 @@ Rules:
   - keep the summary to 1-2 short paragraphs
   - keep sections to 3-6 focused chunks
   - keep paragraph text short
+  - in HTML, each section becomes a page in book view
   - use evidence from code, diffs, tests, and session history
 
 Fast paths:
@@ -65,7 +66,7 @@ Examples:
   magellan prompt --agent-type codex --source pr --goal handoff --scope backend --scope tests --artifact /tmp/handoff.json --focus verification --focus decisions
 
 Goals:
-  walkthrough  Create a broad narrated explainer of the change.
+  walkthrough  Create a broad technical walkthrough of the change.
   followup     Answer a narrower question with a tighter artifact.
   handoff      Prepare another engineer to pick up the work quickly.
 
@@ -103,8 +104,8 @@ Payload shape reminders:
 
 const EXAMPLE_AFTER_HELP: &str = "\
 Starter presets:
-  walkthrough   Broad narrated explainer with request-flow emphasis
-  timeline      Ordered story when sequence of work matters
+  walkthrough   Broad technical walkthrough with request-flow emphasis
+  timeline      Ordered sequence when implementation order matters
   before_after  Behavior comparison when the change is best shown side by side
 
 Checked-in realistic references:
@@ -126,7 +127,7 @@ const RENDER_AFTER_HELP: &str = "\
 Format guide:
   terminal  Fast in-chat or terminal explanation with ASCII diagrams
   markdown  Good for chat messages, docs, or PR comments with Mermaid blocks
-  html      Best for paced visual walkthroughs and report-style reading
+  html      Best for paced visual walkthroughs; opens in book view with an overview toggle
 
 Diagram guide:
   sequence         Request or actor-by-actor interaction flow
@@ -140,6 +141,8 @@ Examples:
   magellan render --input examples/branch-handoff-timeline.json --format markdown
   magellan render --input examples/followup-validation-question.json --format html --open
   cat payload.json | magellan render --input - --format html --open
+
+HTML reports now default to a page-by-page book layout. Use the built-in Overview switch inside the report when you want the whole walkthrough at once.
 
 `--open` requires `--format html`.";
 
@@ -398,7 +401,7 @@ Workflow:
    - `summary` with 1-2 short paragraphs
    - `sections` shaped for this goal: {section_guidance}
    - short `text` arrays instead of long prose
-   - optional `diagram` objects when they clarify the story
+   - optional `diagram` objects when they clarify the technical flow
    - optional `verification`
 5. Run `magellan validate --input {artifact}`.
 6. Run `{render_command}`.
@@ -408,7 +411,8 @@ Content rules:
 - Do not narrate file churn.
 - Do not invent details that are not grounded in evidence.
 - Keep the walkthrough paced and scannable.
-- Prefer diagrams only when they make the story easier to follow.
+- Each section becomes a page in HTML book view, so keep one idea per section.
+- Prefer diagrams only when they make the technical explanation easier to follow.
 
 Diagram selection:
 {diagram_guidance}
@@ -572,7 +576,9 @@ fn format_render_command(path: &Path, render_format: OutputFormat) -> String {
 
 fn prompt_focus_guidance(focuses: &[CliPromptFocus]) -> String {
     if focuses.is_empty() {
-        return String::from("- no explicit focus was requested; choose the clearest story arc");
+        return String::from(
+            "- no explicit focus was requested; choose the clearest technical framing",
+        );
     }
 
     focuses
@@ -616,7 +622,7 @@ fn prompt_source_guidance(source: CliPromptSource) -> &'static str {
 fn prompt_goal_guidance(goal: CliPromptGoal) -> &'static str {
     match goal {
         CliPromptGoal::Walkthrough => {
-            "- produce a broad narrated explainer that tells the full story of the change"
+            "- produce a broad technical walkthrough that covers the full change without drifting into fluff"
         }
         CliPromptGoal::Followup => {
             "- answer a narrower follow-up question and stay tighter than a full walkthrough"
@@ -629,7 +635,7 @@ fn prompt_goal_guidance(goal: CliPromptGoal) -> &'static str {
 
 fn prompt_goal_section_guidance(goal: CliPromptGoal) -> &'static str {
     match goal {
-        CliPromptGoal::Walkthrough => "3-6 focused steps that cover the main story arc",
+        CliPromptGoal::Walkthrough => "3-6 focused steps that cover the main technical flow",
         CliPromptGoal::Followup => "2-4 focused steps centered on the specific question",
         CliPromptGoal::Handoff => {
             "3-6 focused steps, with explicit attention to decisions, risks, and verification"
@@ -665,7 +671,7 @@ fn prompt_scope_guidance(scopes: &[String]) -> String {
 fn prompt_diagram_guidance(goal: CliPromptGoal, focuses: &[CliPromptFocus]) -> String {
     let mut guidance = vec![
         String::from(
-            "- use `sequence` when readers need to follow actors or request flow step by step",
+            "- use `sequence` when engineers need to follow actors or request flow step by step",
         ),
         String::from("- use `flow` for branching logic, validation gates, or state movement"),
         String::from(
@@ -684,7 +690,7 @@ fn prompt_diagram_guidance(goal: CliPromptGoal, focuses: &[CliPromptFocus]) -> S
 
     if goal == CliPromptGoal::Handoff || focuses.contains(&CliPromptFocus::Timeline) {
         guidance.push(String::from(
-            "- for this artifact, include a `timeline` section when implementation order helps the reader pick up the work",
+            "- for this artifact, include a `timeline` section when implementation order helps another engineer pick up the work",
         ));
     }
 
@@ -696,7 +702,7 @@ fn prompt_diagram_guidance(goal: CliPromptGoal, focuses: &[CliPromptFocus]) -> S
 
     if focuses.contains(&CliPromptFocus::Behavior) {
         guidance.push(String::from(
-            "- behavior-focused explanations usually benefit from `sequence`, `flow`, or `before_after`, depending on the story",
+            "- behavior-focused explanations usually benefit from `sequence`, `flow`, or `before_after`, depending on the technical change",
         ));
     }
 

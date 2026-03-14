@@ -38,6 +38,11 @@ fn prompt_question_flow_works_end_to_end_with_real_binary() {
     assert!(prompt.contains("magellan validate --input /tmp/question-flow.json"));
     assert!(prompt.contains("magellan render --input /tmp/question-flow.json --format markdown"));
     assert!(prompt.contains("inspect the current diff or commit range"));
+    assert!(
+        prompt.contains(
+            "Each section becomes a page in HTML book view, so keep one idea per section."
+        )
+    );
 }
 
 #[test]
@@ -122,7 +127,7 @@ fn prompt_handoff_flow_recommends_timeline_and_component_graph_end_to_end() {
     let prompt = fs::read_to_string(&prompt_path).expect("prompt output should be readable");
 
     assert!(prompt.contains(
-        "for this artifact, include a `timeline` section when implementation order helps the reader pick up the work"
+        "for this artifact, include a `timeline` section when implementation order helps another engineer pick up the work"
     ));
     assert!(prompt.contains(
         "architecture-focused explanations usually benefit from a `component_graph` section"

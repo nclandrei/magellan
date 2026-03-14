@@ -116,11 +116,19 @@ fn render_markdown(document: &Document) -> String {
 
 fn render_html(document: &Document) -> String {
     let summary_html = paragraphs_to_html(&document.summary);
+    let diagram_count = document
+        .sections
+        .iter()
+        .filter(|section| section.diagram.is_some())
+        .count();
+    let total_pages = 1 + document.sections.len() + usize::from(document.verification.is_some());
+    let book_pages_html = render_book_pages(document, total_pages, diagram_count);
+    let page_dots_html = render_page_dots(document);
     let sections_html = document
         .sections
         .iter()
         .enumerate()
-        .map(|(index, section)| render_section_html(index, section))
+        .map(|(index, section)| render_overview_section_html(index, section))
         .collect::<Vec<_>>()
         .join("\n");
     let verification_html = document
@@ -142,140 +150,254 @@ fn render_html(document: &Document) -> String {
   <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
   <title>{title}</title>
   <link rel=\"icon\" href=\"data:,\">
-  <style>
-    :root {{
-      color-scheme: light;
-      --bg: #f5efe4;
-      --paper: rgba(255, 252, 246, 0.92);
-      --ink: #1c1917;
-      --muted: #57534e;
-      --accent: #0f766e;
-      --border: rgba(28, 25, 23, 0.12);
-      --shadow: 0 24px 60px rgba(28, 25, 23, 0.12);
-    }}
-    * {{
-      box-sizing: border-box;
-    }}
-    body {{
-      margin: 0;
-      font-family: ui-serif, Georgia, Cambria, \"Times New Roman\", Times, serif;
-      background:
-        radial-gradient(circle at top left, rgba(15, 118, 110, 0.18), transparent 28%),
-        linear-gradient(160deg, #f8f3eb 0%, #ece3d3 100%);
-      color: var(--ink);
-    }}
-    main {{
-      max-width: 920px;
-      margin: 0 auto;
-      padding: 48px 20px 80px;
-    }}
-    .hero,
-    .panel {{
-      background: var(--paper);
-      border: 1px solid var(--border);
-      border-radius: 22px;
-      box-shadow: var(--shadow);
-      padding: 28px;
-      backdrop-filter: blur(6px);
-    }}
-    .hero {{
-      margin-bottom: 20px;
-    }}
-    .eyebrow {{
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      font-size: 0.78rem;
-      color: var(--accent);
-      margin: 0 0 8px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    }}
-    h1, h2 {{
-      margin: 0 0 12px;
-      line-height: 1.1;
-      font-weight: 700;
-    }}
-    h1 {{
-      font-size: clamp(2.2rem, 6vw, 3.8rem);
-    }}
-    h2 {{
-      font-size: clamp(1.4rem, 4vw, 2rem);
-    }}
-    p {{
-      margin: 0 0 14px;
-      color: var(--muted);
-      font-size: 1.05rem;
-      line-height: 1.65;
-    }}
-    .stack {{
-      display: grid;
-      gap: 20px;
-    }}
-    .diagram {{
-      margin-top: 18px;
-      border-radius: 18px;
-      border: 1px solid rgba(15, 118, 110, 0.16);
-      background: linear-gradient(180deg, rgba(248, 250, 252, 0.96) 0%, rgba(241, 245, 249, 0.94) 100%);
-      padding: 18px;
-    }}
-    .diagram-label {{
-      margin: 0 0 12px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 0.82rem;
-      font-weight: 600;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      color: var(--accent);
-    }}
-    .diagram svg {{
-      display: block;
-      width: 100%;
-      height: auto;
-    }}
-    details {{
-      margin-top: 16px;
-    }}
-    summary {{
-      cursor: pointer;
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      color: var(--accent);
-      font-size: 0.88rem;
-    }}
-    pre {{
-      margin: 18px 0 0;
-      padding: 18px;
-      border-radius: 16px;
-      border: 1px solid rgba(15, 118, 110, 0.2);
-      background: #f8fafc;
-      overflow-x: auto;
-      color: #0f172a;
-      font-size: 0.95rem;
-      line-height: 1.4;
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    }}
-  </style>
+  <style>{style}</style>
 </head>
 <body>
-  <main>
-    <section class=\"hero\">
-      <p class=\"eyebrow\">Magellan walkthrough</p>
-      <h1>{title}</h1>
-      {summary_html}
+  <main class=\"report-shell\" data-magellan-report>
+    <header class=\"report-bar\">
+      <div class=\"report-bar-copy\">
+        <p class=\"eyebrow\">Magellan walkthrough</p>
+        <h1>{title}</h1>
+        <p class=\"report-note\">Book view shows one technical slice at a time. Switch to overview when you want the whole walkthrough at once.</p>
+      </div>
+      <div class=\"report-toolbar\">
+        <div class=\"view-toggle-group\" role=\"tablist\" aria-label=\"Report views\">
+          <button class=\"view-toggle is-active\" type=\"button\" data-view-target=\"book\" aria-pressed=\"true\">Book View</button>
+          <button class=\"view-toggle\" type=\"button\" data-view-target=\"overview\" aria-pressed=\"false\">Overview</button>
+        </div>
+        <div class=\"page-status\" aria-live=\"polite\">
+          <span class=\"page-label\" data-current-page-label>Summary</span>
+          <span class=\"page-counter\" data-page-counter>Page 1 / {total_pages}</span>
+        </div>
+      </div>
+    </header>
+
+    <section class=\"book-view is-active\" data-view=\"book\">
+      <div class=\"book-shell\">
+        <div class=\"book-window\">
+          <div class=\"book-track\" data-book-track>
+            {book_pages_html}
+          </div>
+        </div>
+        <div class=\"book-nav\">
+          <button class=\"nav-button\" type=\"button\" data-prev-page>Previous</button>
+          <div class=\"page-dots\" aria-label=\"Walkthrough pages\">
+            {page_dots_html}
+          </div>
+          <button class=\"nav-button\" type=\"button\" data-next-page>Next</button>
+        </div>
+      </div>
     </section>
-    <div class=\"stack\">
-      {sections_html}
-      {verification_html}
-    </div>
+
+    <section class=\"overview-view\" data-view=\"overview\" hidden>
+      <section class=\"hero\">
+        <p class=\"eyebrow\">Unified view</p>
+        <h2>{title}</h2>
+        {summary_html}
+      </section>
+      <div class=\"stack\">
+        {sections_html}
+        {verification_html}
+      </div>
+    </section>
   </main>
+  <script>{script}</script>
 </body>
 </html>",
         title = escape_html(&document.title),
+        total_pages = total_pages,
         summary_html = summary_html,
         sections_html = sections_html,
-        verification_html = verification_html
+        verification_html = verification_html,
+        book_pages_html = book_pages_html,
+        page_dots_html = page_dots_html,
+        style = html_style(),
+        script = html_script()
     )
 }
 
-fn render_section_html(index: usize, section: &Section) -> String {
+fn render_book_pages(document: &Document, total_pages: usize, diagram_count: usize) -> String {
+    let mut pages = vec![render_summary_page(
+        &document.title,
+        &document.summary,
+        total_pages,
+        document.sections.len(),
+        diagram_count,
+        document.verification.is_some(),
+    )];
+
+    pages.extend(
+        document
+            .sections
+            .iter()
+            .enumerate()
+            .map(|(index, section)| render_section_page(index, total_pages, section)),
+    );
+
+    if let Some(verification) = &document.verification {
+        pages.push(render_verification_page(
+            total_pages - 1,
+            total_pages,
+            verification,
+        ));
+    }
+
+    pages.join("\n")
+}
+
+fn render_summary_page(
+    title: &str,
+    summary: &[String],
+    total_pages: usize,
+    section_count: usize,
+    diagram_count: usize,
+    has_verification: bool,
+) -> String {
+    let verification_label = if has_verification { "Included" } else { "None" };
+
+    format!(
+        "<article class=\"page page-summary is-current\" data-page data-page-title=\"Summary\">
+          <div class=\"page-head\">
+            <p class=\"eyebrow\">Overview page</p>
+            <p class=\"page-step\">Page 1 / {total_pages}</p>
+          </div>
+          <div class=\"page-grid summary-grid\">
+            <div class=\"page-copy\">
+              <h2>{title}</h2>
+              {summary_html}
+            </div>
+            <aside class=\"summary-stats\" aria-label=\"Walkthrough summary\">
+              <div class=\"stat-card\">
+                <span class=\"stat-label\">Pages</span>
+                <strong>{total_pages}</strong>
+              </div>
+              <div class=\"stat-card\">
+                <span class=\"stat-label\">Sections</span>
+                <strong>{section_count}</strong>
+              </div>
+              <div class=\"stat-card\">
+                <span class=\"stat-label\">Diagrams</span>
+                <strong>{diagram_count}</strong>
+              </div>
+              <div class=\"stat-card\">
+                <span class=\"stat-label\">Verification</span>
+                <strong>{verification_label}</strong>
+              </div>
+            </aside>
+          </div>
+        </article>",
+        title = escape_html(title),
+        summary_html = paragraphs_to_html(summary),
+        total_pages = total_pages,
+        section_count = section_count,
+        diagram_count = diagram_count,
+        verification_label = verification_label
+    )
+}
+
+fn render_section_page(index: usize, total_pages: usize, section: &Section) -> String {
+    let page_number = index + 2;
+    let diagram_html = section
+        .diagram
+        .as_ref()
+        .map(|diagram| {
+            format!(
+                "<div class=\"page-visual\">{}</div>",
+                render_diagram_html(index, diagram)
+            )
+        })
+        .unwrap_or_default();
+    let page_class = if section.diagram.is_some() {
+        "page has-diagram"
+    } else {
+        "page"
+    };
+
+    format!(
+        "<article class=\"{page_class}\" data-page data-page-title=\"{title}\">
+          <div class=\"page-head\">
+            <p class=\"eyebrow\">Step {step}</p>
+            <p class=\"page-step\">Page {page_number} / {total_pages}</p>
+          </div>
+          <div class=\"page-grid\">
+            {diagram_html}
+            <div class=\"page-copy\">
+              <h2>{title}</h2>
+              {text_html}
+            </div>
+          </div>
+        </article>",
+        page_class = page_class,
+        step = index + 1,
+        page_number = page_number,
+        total_pages = total_pages,
+        title = escape_html(&section.title),
+        text_html = paragraphs_to_html(&section.text),
+        diagram_html = diagram_html
+    )
+}
+
+fn render_verification_page(
+    page_index: usize,
+    total_pages: usize,
+    verification: &crate::model::Verification,
+) -> String {
+    format!(
+        "<article class=\"page page-verification\" data-page data-page-title=\"Verification\">
+          <div class=\"page-head\">
+            <p class=\"eyebrow\">Verification</p>
+            <p class=\"page-step\">Page {page_number} / {total_pages}</p>
+          </div>
+          <div class=\"page-grid verification-grid\">
+            <div class=\"verification-badge\" aria-hidden=\"true\">Verified</div>
+            <div class=\"page-copy\">
+              <h2>Verification</h2>
+              {text_html}
+            </div>
+          </div>
+        </article>",
+        page_number = page_index + 1,
+        total_pages = total_pages,
+        text_html = paragraphs_to_html(&verification.text)
+    )
+}
+
+fn render_page_dots(document: &Document) -> String {
+    let mut dots = vec![render_page_dot(0, "Summary", true)];
+
+    dots.extend(
+        document
+            .sections
+            .iter()
+            .enumerate()
+            .map(|(index, section)| render_page_dot(index + 1, &section.title, false)),
+    );
+
+    if document.verification.is_some() {
+        dots.push(render_page_dot(
+            document.sections.len() + 1,
+            "Verification",
+            false,
+        ));
+    }
+
+    dots.join("\n")
+}
+
+fn render_page_dot(index: usize, label: &str, is_active: bool) -> String {
+    let active_class = if is_active { " is-active" } else { "" };
+    let current = if is_active { "true" } else { "false" };
+
+    format!(
+        "<button class=\"page-dot{active_class}\" type=\"button\" data-page-dot=\"{index}\" aria-label=\"Go to {label}\" aria-current=\"{current}\"></button>",
+        active_class = active_class,
+        index = index,
+        label = escape_html(label),
+        current = current
+    )
+}
+
+fn render_overview_section_html(index: usize, section: &Section) -> String {
     let diagram_html = section
         .diagram
         .as_ref()
@@ -288,6 +410,498 @@ fn render_section_html(index: usize, section: &Section) -> String {
         paragraphs_to_html(&section.text),
         diagram_html
     )
+}
+
+fn html_style() -> &'static str {
+    r#"
+    :root {
+      color-scheme: light;
+      --paper: rgba(255, 252, 246, 0.94);
+      --paper-strong: rgba(255, 251, 244, 0.98);
+      --ink: #1c1917;
+      --muted: #57534e;
+      --accent: #0f766e;
+      --accent-soft: rgba(15, 118, 110, 0.12);
+      --border: rgba(28, 25, 23, 0.12);
+      --shadow: 0 24px 60px rgba(28, 25, 23, 0.12);
+    }
+    * {
+      box-sizing: border-box;
+    }
+    html {
+      scroll-behavior: smooth;
+    }
+    body {
+      margin: 0;
+      font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+      background:
+        radial-gradient(circle at top left, rgba(15, 118, 110, 0.18), transparent 30%),
+        linear-gradient(160deg, #f8f3eb 0%, #ece3d3 100%);
+      color: var(--ink);
+    }
+    .report-shell {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 32px 18px 72px;
+    }
+    .report-bar,
+    .hero,
+    .panel,
+    .page {
+      background: var(--paper);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(6px);
+    }
+    .report-bar {
+      display: grid;
+      gap: 20px;
+      margin-bottom: 22px;
+      padding: 26px;
+    }
+    .report-bar-copy {
+      max-width: 760px;
+    }
+    .report-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      position: relative;
+      z-index: 3;
+    }
+    .eyebrow {
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 0.78rem;
+      color: var(--accent);
+      margin: 0 0 8px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    h1,
+    h2 {
+      margin: 0 0 12px;
+      line-height: 1.05;
+      font-weight: 700;
+    }
+    h1 {
+      font-size: clamp(2rem, 5vw, 3.2rem);
+    }
+    h2 {
+      font-size: clamp(1.45rem, 3vw, 2.15rem);
+    }
+    p {
+      margin: 0 0 14px;
+      color: var(--muted);
+      font-size: 1.04rem;
+      line-height: 1.68;
+    }
+    .report-note {
+      max-width: 54ch;
+      margin: 0;
+    }
+    .view-toggle-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.66);
+      border: 1px solid rgba(15, 118, 110, 0.14);
+    }
+    .view-toggle,
+    .nav-button,
+    .page-dot {
+      appearance: none;
+      border: 0;
+      cursor: pointer;
+      transition: transform 140ms ease, background-color 140ms ease, color 140ms ease, opacity 140ms ease;
+    }
+    .view-toggle {
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: transparent;
+      color: var(--muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.88rem;
+    }
+    .view-toggle.is-active {
+      background: var(--accent);
+      color: #f8fafc;
+    }
+    .page-status {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 2px;
+      min-width: 132px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .page-label {
+      font-size: 0.92rem;
+      color: var(--ink);
+      font-weight: 600;
+    }
+    .page-counter {
+      font-size: 0.8rem;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .book-view[hidden],
+    .overview-view[hidden] {
+      display: none;
+    }
+    .book-shell {
+      display: grid;
+      gap: 16px;
+      height: calc(100vh - 280px);
+      grid-template-rows: minmax(0, 1fr) auto;
+    }
+    .book-window {
+      overflow: hidden;
+      border-radius: 28px;
+      position: relative;
+      z-index: 1;
+      min-height: 0;
+      height: 100%;
+    }
+    .book-track {
+      display: flex;
+      width: 100%;
+      transition: transform 280ms ease;
+    }
+    .page {
+      width: 100%;
+      min-width: 100%;
+      padding: 24px;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      overflow-y: auto;
+    }
+    .page-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid rgba(15, 118, 110, 0.1);
+    }
+    .page-step {
+      margin: 0;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.82rem;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+    }
+    .page-grid {
+      display: grid;
+      gap: 20px;
+      align-items: start;
+      grid-template-columns: 1fr;
+    }
+    .page.has-diagram .page-grid {
+      grid-template-columns: minmax(0, 1.08fr) minmax(280px, 0.92fr);
+    }
+    .page-copy {
+      min-width: 0;
+    }
+    .page-copy p:last-child {
+      margin-bottom: 0;
+    }
+    .page-visual {
+      min-width: 0;
+    }
+    .summary-grid {
+      grid-template-columns: minmax(0, 1.15fr) minmax(260px, 0.85fr);
+      align-items: stretch;
+    }
+    .summary-stats {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .stat-card {
+      background: var(--paper-strong);
+      border: 1px solid rgba(15, 118, 110, 0.14);
+      border-radius: 20px;
+      padding: 16px;
+      display: grid;
+      gap: 8px;
+      align-content: start;
+    }
+    .stat-label {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--accent);
+    }
+    .stat-card strong {
+      font-size: 1.35rem;
+      color: var(--ink);
+    }
+    .verification-grid {
+      grid-template-columns: 110px minmax(0, 1fr);
+      align-items: start;
+    }
+    .verification-badge {
+      width: 92px;
+      height: 92px;
+      border-radius: 999px;
+      background: radial-gradient(circle at 30% 30%, rgba(15, 118, 110, 0.2), rgba(15, 118, 110, 0.08));
+      border: 1px solid rgba(15, 118, 110, 0.18);
+      display: grid;
+      place-items: center;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.84rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+    }
+    .book-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 16px;
+      position: fixed;
+      left: 50%;
+      bottom: 18px;
+      transform: translateX(-50%);
+      width: min(960px, calc(100vw - 24px));
+      z-index: 3;
+      border-radius: 999px;
+      background: rgba(255, 252, 246, 0.9);
+      border: 1px solid rgba(15, 118, 110, 0.14);
+      box-shadow: 0 18px 40px rgba(28, 25, 23, 0.16);
+      backdrop-filter: blur(12px);
+    }
+    .nav-button {
+      padding: 12px 18px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.72);
+      color: var(--ink);
+      border: 1px solid rgba(15, 118, 110, 0.14);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.86rem;
+    }
+    .nav-button[disabled] {
+      opacity: 0.48;
+      cursor: default;
+      transform: none;
+    }
+    .page-dots {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+    .page-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      background: rgba(15, 118, 110, 0.18);
+      border: 1px solid rgba(15, 118, 110, 0.22);
+      padding: 0;
+    }
+    .page-dot.is-active {
+      width: 34px;
+      background: var(--accent);
+    }
+    .hero,
+    .panel {
+      padding: 28px;
+    }
+    .hero {
+      margin-bottom: 20px;
+    }
+    .stack {
+      display: grid;
+      gap: 20px;
+    }
+    .diagram {
+      margin-top: 0;
+      border-radius: 20px;
+      border: 1px solid rgba(15, 118, 110, 0.16);
+      background: linear-gradient(180deg, rgba(248, 250, 252, 0.96) 0%, rgba(241, 245, 249, 0.94) 100%);
+      padding: 18px;
+    }
+    .diagram-label {
+      margin: 0 0 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.82rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+    .diagram svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+    details {
+      margin-top: 16px;
+    }
+    summary {
+      cursor: pointer;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      color: var(--accent);
+      font-size: 0.88rem;
+    }
+    pre {
+      margin: 18px 0 0;
+      padding: 18px;
+      border-radius: 16px;
+      border: 1px solid rgba(15, 118, 110, 0.2);
+      background: #f8fafc;
+      overflow-x: auto;
+      color: #0f172a;
+      font-size: 0.95rem;
+      line-height: 1.4;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .nav-button:hover:not([disabled]),
+    .view-toggle:hover,
+    .page-dot:hover {
+      transform: translateY(-1px);
+    }
+    @media (max-width: 840px) {
+      .summary-grid,
+      .page.has-diagram .page-grid,
+      .verification-grid {
+        grid-template-columns: 1fr;
+      }
+      .page-status {
+        align-items: flex-start;
+      }
+      .book-nav {
+        flex-wrap: wrap;
+        justify-content: center;
+        width: calc(100vw - 20px);
+        bottom: 10px;
+      }
+      .report-toolbar {
+        align-items: flex-start;
+      }
+      .book-shell {
+        height: calc(100vh - 240px);
+      }
+    }
+    @media (max-width: 560px) {
+      .report-shell {
+        padding: 20px 12px 48px;
+      }
+      .report-bar,
+      .hero,
+      .panel,
+      .page {
+        border-radius: 20px;
+        padding: 20px;
+      }
+      .summary-stats {
+        grid-template-columns: 1fr 1fr;
+      }
+      .view-toggle-group {
+        width: 100%;
+      }
+      .view-toggle {
+        flex: 1;
+        text-align: center;
+      }
+    }
+    "#
+}
+
+fn html_script() -> &'static str {
+    r#"
+    (() => {
+      const root = document.querySelector('[data-magellan-report]');
+      if (!root) return;
+
+      const views = {
+        book: root.querySelector('[data-view="book"]'),
+        overview: root.querySelector('[data-view="overview"]'),
+      };
+      const toggles = Array.from(root.querySelectorAll('[data-view-target]'));
+      const track = root.querySelector('[data-book-track]');
+      const pages = Array.from(root.querySelectorAll('[data-page]'));
+      const dots = Array.from(root.querySelectorAll('[data-page-dot]'));
+      const prev = root.querySelector('[data-prev-page]');
+      const next = root.querySelector('[data-next-page]');
+      const pageLabel = root.querySelector('[data-current-page-label]');
+      const pageCounter = root.querySelector('[data-page-counter]');
+
+      const state = { view: 'book', page: 0 };
+
+      function setView(view) {
+        state.view = view;
+        Object.entries(views).forEach(([name, element]) => {
+          if (!element) return;
+          const active = name === view;
+          element.hidden = !active;
+          element.classList.toggle('is-active', active);
+        });
+        toggles.forEach((button) => {
+          const active = button.dataset.viewTarget === view;
+          button.classList.toggle('is-active', active);
+          button.setAttribute('aria-pressed', String(active));
+        });
+      }
+
+      function setPage(page) {
+        const bounded = Math.max(0, Math.min(page, pages.length - 1));
+        state.page = bounded;
+        if (track) {
+          track.style.transform = `translateX(-${bounded * 100}%)`;
+        }
+        pages.forEach((pageElement, index) => {
+          pageElement.classList.toggle('is-current', index === bounded);
+        });
+        dots.forEach((dot, index) => {
+          const active = index === bounded;
+          dot.classList.toggle('is-active', active);
+          dot.setAttribute('aria-current', String(active));
+        });
+        if (prev) prev.disabled = bounded === 0;
+        if (next) next.disabled = bounded === pages.length - 1;
+        if (pageLabel && pages[bounded]) {
+          pageLabel.textContent = pages[bounded].dataset.pageTitle || `Page ${bounded + 1}`;
+        }
+        if (pageCounter) {
+          pageCounter.textContent = `Page ${bounded + 1} / ${pages.length}`;
+        }
+      }
+
+      toggles.forEach((button) => {
+        button.addEventListener('click', () => setView(button.dataset.viewTarget || 'book'));
+      });
+      dots.forEach((dot, index) => {
+        dot.addEventListener('click', () => {
+          setView('book');
+          setPage(index);
+        });
+      });
+      if (prev) prev.addEventListener('click', () => setPage(state.page - 1));
+      if (next) next.addEventListener('click', () => setPage(state.page + 1));
+      window.addEventListener('keydown', (event) => {
+        if (state.view !== 'book') return;
+        if (event.key === 'ArrowRight') setPage(state.page + 1);
+        if (event.key === 'ArrowLeft') setPage(state.page - 1);
+      });
+
+      setView('book');
+      setPage(0);
+    })();
+    "#
 }
 
 fn render_diagram_html(index: usize, diagram: &Diagram) -> String {
@@ -1029,6 +1643,12 @@ mod tests {
 
         assert!(rendered.contains("<!DOCTYPE html>"));
         assert!(rendered.contains("Magellan walkthrough"));
+        assert!(rendered.contains("Book View"));
+        assert!(rendered.contains("Overview"));
+        assert!(rendered.contains("data-view=\"book\""));
+        assert!(rendered.contains("data-view=\"overview\" hidden"));
+        assert!(rendered.contains("data-book-track"));
+        assert!(rendered.contains("Page 1 / 3"));
         assert!(rendered.contains("<link rel=\"icon\" href=\"data:,\">"));
         assert!(rendered.contains("<svg viewBox="));
         assert!(rendered.contains("ASCII fallback"));

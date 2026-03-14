@@ -39,6 +39,7 @@ Magellan pushes the output into a better shape:
 - 3-6 sections
 - short section text instead of essays
 - diagrams when they help explain flow, architecture, timing, or before/after changes
+- HTML reports default to a book-style view so engineers see one technical slice at a time instead of one long wall of text
 
 ## Payload Shape
 
@@ -79,9 +80,10 @@ The source of truth is `magellan schema`, but the payload looks like this at a h
 
 - `terminal`: compact text with ASCII diagrams
 - `markdown`: sectioned Markdown with Mermaid blocks
-- `html`: a styled local report with self-contained inline diagrams and ASCII fallbacks
+- `html`: a styled local report with self-contained inline diagrams, a page-by-page book view, and an overview toggle
 
 When you pass `--open` with `--format html`, Magellan writes the report and opens it in the default browser. If `--out` is omitted, Magellan creates a temp file automatically.
+In HTML, the summary becomes the opening page and each section becomes its own page, so the agent should keep one idea per section.
 
 ## Example Reports
 

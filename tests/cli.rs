@@ -55,6 +55,9 @@ fn help_mentions_prompt_workflow() {
         .stdout(predicate::str::contains("Fast paths:"))
         .stdout(predicate::str::contains("Diagram picking cheat sheet:"))
         .stdout(predicate::str::contains(
+            "in HTML, each section becomes a page in book view",
+        ))
+        .stdout(predicate::str::contains(
             "examples/session-walkthrough.json",
         ))
         .stdout(predicate::str::contains(
@@ -79,7 +82,10 @@ fn prompt_command_prints_codex_template() {
             "inspect session messages, tool actions, and timestamps",
         ))
         .stdout(predicate::str::contains(
-            "produce a broad narrated explainer that tells the full story of the change",
+            "produce a broad technical walkthrough that covers the full change without drifting into fluff",
+        ))
+        .stdout(predicate::str::contains(
+            "Each section becomes a page in HTML book view, so keep one idea per section.",
         ))
         .stdout(predicate::str::contains(
             "magellan render --input /tmp/magellan.json --format html --open",
@@ -135,7 +141,7 @@ fn example_help_points_to_presets_and_realistic_references() {
         .success()
         .stdout(predicate::str::contains("Starter presets:"))
         .stdout(predicate::str::contains(
-            "timeline      Ordered story when sequence of work matters",
+            "timeline      Ordered sequence when implementation order matters",
         ))
         .stdout(predicate::str::contains(
             "examples/followup-validation-question.json",
@@ -171,6 +177,9 @@ fn render_help_explains_formats_and_diagram_types() {
         ))
         .stdout(predicate::str::contains(
             "magellan render --input examples/followup-validation-question.json --format html --open",
+        ))
+        .stdout(predicate::str::contains(
+            "HTML reports now default to a page-by-page book layout.",
         ))
         .stdout(predicate::str::contains("`--open` requires `--format html`."));
 }
@@ -325,7 +334,7 @@ fn prompt_command_with_handoff_and_timeline_focus_recommends_timeline_sections()
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "for this artifact, include a `timeline` section when implementation order helps the reader pick up the work",
+            "for this artifact, include a `timeline` section when implementation order helps another engineer pick up the work",
         ))
         .stdout(predicate::str::contains(
             "architecture-focused explanations usually benefit from a `component_graph` section",
@@ -380,6 +389,9 @@ fn render_command_can_write_html_to_a_file() {
     assert!(rendered.contains("<!DOCTYPE html>"));
     assert!(rendered.contains("Order validation moved earlier"));
     assert!(rendered.contains("<svg viewBox="));
+    assert!(rendered.contains("Book View"));
+    assert!(rendered.contains("Overview"));
+    assert!(rendered.contains("data-book-track"));
     assert!(!rendered.contains("cdn.jsdelivr"));
 }
 

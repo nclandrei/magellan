@@ -121,7 +121,7 @@ fn before_after_example() -> Document {
         sections: vec![Section {
             title: "Behavior change".into(),
             text: vec![
-                "This is useful when the story is mostly about how the user experience changed.".into(),
+                "This is useful when the main point is how the user experience changed.".into(),
             ],
             diagram: Some(Diagram::BeforeAfter(BeforeAfterDiagram {
                 before: vec![

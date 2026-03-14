@@ -35,6 +35,8 @@ fn fixture_cases() -> [FixtureCase; 3] {
             ],
             html_markers: &[
                 "Magellan walkthrough",
+                "Book View",
+                "Overview",
                 "Sequence diagram",
                 "Flow diagram",
                 "Component diagram",
@@ -57,6 +59,8 @@ fn fixture_cases() -> [FixtureCase; 3] {
             ],
             html_markers: &[
                 "Magellan walkthrough",
+                "Book View",
+                "Overview",
                 "Timeline",
                 "Flow diagram",
                 "Verification",
@@ -74,6 +78,8 @@ fn fixture_cases() -> [FixtureCase; 3] {
             ],
             html_markers: &[
                 "Magellan walkthrough",
+                "Book View",
+                "Overview",
                 "Flow diagram",
                 "Before / after",
                 "ASCII fallback",
@@ -186,5 +192,38 @@ fn checked_in_fixtures_render_expected_html_output() {
                 marker
             );
         }
+        assert!(
+            html.contains("data-book-track"),
+            "html render for {} should include the paged book track",
+            case.path
+        );
+        assert!(
+            html.contains("data-view=\"overview\" hidden"),
+            "html render for {} should include the overview view",
+            case.path
+        );
     }
+}
+
+#[test]
+fn session_fixture_html_includes_expected_book_paging_structure() {
+    let temp_dir = tempfile::tempdir().expect("temp dir should be created");
+    let output_path = temp_dir.path().join("session-book.html");
+
+    Command::cargo_bin("magellan")
+        .expect("binary should build")
+        .args(["render", "--input"])
+        .arg(fixture_path("examples/session-walkthrough.json"))
+        .args(["--format", "html", "--out"])
+        .arg(&output_path)
+        .assert()
+        .success();
+
+    let html = fs::read_to_string(&output_path).expect("html output should be readable");
+    let page_count = html.matches("data-page-title=").count();
+    let dot_count = html.matches("data-page-dot=").count();
+
+    assert_eq!(page_count, 5, "summary + 3 sections + verification");
+    assert_eq!(dot_count, 5, "book navigation should mirror the page count");
+    assert!(html.contains("Book view shows one technical slice at a time."));
 }
