@@ -5,7 +5,9 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand, ValueEnum};
 
-use magellan::{Document, OutputFormat, render_document, schema_json};
+use magellan::{
+    Document, ExamplePreset, OutputFormat, example_document, render_document, schema_json,
+};
 
 const AFTER_HELP: &str = "\
 Magellan is a deterministic presentation engine for AI-generated walkthroughs.
@@ -17,6 +19,7 @@ Give it structured content, not long prose blobs:
   - optional diagrams when they improve comprehension
 
 Use `magellan schema` to inspect the expected JSON payload.
+Use `magellan example --preset walkthrough` when you want a starter payload.
 Pass `--input -` to read JSON from stdin.";
 
 #[derive(Parser, Debug)]
@@ -35,6 +38,12 @@ struct Cli {
 enum Command {
     /// Print the JSON Schema for Magellan's input payload.
     Schema,
+    /// Print a starter payload that agents can edit before rendering.
+    Example {
+        /// Which starter payload to print.
+        #[arg(long, default_value = "walkthrough")]
+        preset: CliExamplePreset,
+    },
     /// Validate a JSON payload without rendering it.
     Validate {
         /// JSON file to load, or '-' to read from stdin.
@@ -62,6 +71,13 @@ enum CliOutputFormat {
     Html,
 }
 
+#[derive(Clone, Copy, Debug, ValueEnum)]
+enum CliExamplePreset {
+    Walkthrough,
+    Timeline,
+    BeforeAfter,
+}
+
 impl From<CliOutputFormat> for OutputFormat {
     fn from(value: CliOutputFormat) -> Self {
         match value {
@@ -72,12 +88,26 @@ impl From<CliOutputFormat> for OutputFormat {
     }
 }
 
+impl From<CliExamplePreset> for ExamplePreset {
+    fn from(value: CliExamplePreset) -> Self {
+        match value {
+            CliExamplePreset::Walkthrough => ExamplePreset::Walkthrough,
+            CliExamplePreset::Timeline => ExamplePreset::Timeline,
+            CliExamplePreset::BeforeAfter => ExamplePreset::BeforeAfter,
+        }
+    }
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
         Command::Schema => {
             println!("{}", schema_json()?);
+        }
+        Command::Example { preset } => {
+            let document = example_document(preset.into());
+            println!("{}", serde_json::to_string_pretty(&document)?);
         }
         Command::Validate { input } => {
             let document = read_document(&input)?;

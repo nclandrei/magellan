@@ -60,6 +60,18 @@ fn validate_command_accepts_a_valid_payload() {
 }
 
 #[test]
+fn example_command_prints_a_valid_starter_payload() {
+    Command::cargo_bin("magellan")
+        .expect("binary should build")
+        .args(["example", "--preset", "timeline"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"title\": \"Search flow cleanup\"",
+        ));
+}
+
+#[test]
 fn render_command_can_write_html_to_a_file() {
     let temp_dir = tempfile::tempdir().expect("temp dir should be created");
     let input_path = temp_dir.path().join("payload.json");
@@ -79,4 +91,5 @@ fn render_command_can_write_html_to_a_file() {
     let rendered = fs::read_to_string(&output_path).expect("rendered html should be readable");
     assert!(rendered.contains("<!DOCTYPE html>"));
     assert!(rendered.contains("Order validation moved earlier"));
+    assert!(rendered.contains("mermaid"));
 }

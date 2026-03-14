@@ -131,6 +131,31 @@ fn render_html(document: &Document) -> String {
             )
         })
         .unwrap_or_default();
+    let has_diagrams = document
+        .sections
+        .iter()
+        .any(|section| section.diagram.is_some());
+    let mermaid_bootstrap = if has_diagrams {
+        String::from(
+            "<script type=\"module\">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({
+    startOnLoad: true,
+    securityLevel: 'loose',
+    theme: 'base',
+    themeVariables: {
+      primaryColor: '#f4efe6',
+      primaryTextColor: '#1c1917',
+      primaryBorderColor: '#0f766e',
+      lineColor: '#0f766e',
+      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace'
+    }
+  });
+</script>",
+        )
+    } else {
+        String::new()
+    };
 
     format!(
         "<!DOCTYPE html>
@@ -207,6 +232,26 @@ fn render_html(document: &Document) -> String {
       display: grid;
       gap: 20px;
     }}
+    .diagram {{
+      margin-top: 18px;
+      border-radius: 18px;
+      border: 1px solid rgba(15, 118, 110, 0.16);
+      background: linear-gradient(180deg, rgba(248, 250, 252, 0.96) 0%, rgba(241, 245, 249, 0.94) 100%);
+      padding: 18px;
+    }}
+    .diagram .mermaid {{
+      margin: 0;
+      text-align: center;
+    }}
+    details {{
+      margin-top: 16px;
+    }}
+    summary {{
+      cursor: pointer;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      color: var(--accent);
+      font-size: 0.88rem;
+    }}
     pre {{
       margin: 18px 0 0;
       padding: 18px;
@@ -220,6 +265,7 @@ fn render_html(document: &Document) -> String {
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     }}
   </style>
+  {mermaid_bootstrap}
 </head>
 <body>
   <main>
@@ -238,7 +284,8 @@ fn render_html(document: &Document) -> String {
         title = escape_html(&document.title),
         summary_html = summary_html,
         sections_html = sections_html,
-        verification_html = verification_html
+        verification_html = verification_html,
+        mermaid_bootstrap = mermaid_bootstrap
     )
 }
 
@@ -246,7 +293,7 @@ fn render_section_html(section: &Section) -> String {
     let diagram_html = section
         .diagram
         .as_ref()
-        .map(|diagram| format!("<pre>{}</pre>", escape_html(&render_ascii_diagram(diagram))))
+        .map(render_diagram_html)
         .unwrap_or_default();
 
     format!(
@@ -254,6 +301,14 @@ fn render_section_html(section: &Section) -> String {
         escape_html(&section.title),
         paragraphs_to_html(&section.text),
         diagram_html
+    )
+}
+
+fn render_diagram_html(diagram: &Diagram) -> String {
+    let mermaid = escape_html(&render_mermaid_diagram(diagram));
+    let ascii = escape_html(&render_ascii_diagram(diagram));
+    format!(
+        "<div class=\"diagram\"><pre class=\"mermaid\">{mermaid}</pre><details><summary>ASCII fallback</summary><pre>{ascii}</pre></details></div>"
     )
 }
 
@@ -473,6 +528,8 @@ mod tests {
 
         assert!(rendered.contains("<!DOCTYPE html>"));
         assert!(rendered.contains("Magellan walkthrough"));
-        assert!(rendered.contains("<pre>Sequence"));
+        assert!(rendered.contains("cdn.jsdelivr.net/npm/mermaid@11"));
+        assert!(rendered.contains("<pre class=\"mermaid\">sequenceDiagram"));
+        assert!(rendered.contains("ASCII fallback"));
     }
 }

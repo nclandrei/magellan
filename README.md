@@ -8,6 +8,7 @@ It does not call an LLM. Instead, an agent or engineer prepares a structured pay
 
 ```text
 magellan schema
+magellan example --preset walkthrough
 magellan validate --input payload.json
 magellan render --input payload.json --format terminal
 magellan render --input payload.json --format markdown
@@ -15,6 +16,7 @@ magellan render --input payload.json --format html --out /tmp/magellan.html
 ```
 
 Use `--input -` to read a JSON payload from stdin.
+Use `magellan example --preset walkthrough` when you want a starter payload to edit.
 
 ## Why This Exists
 
@@ -69,7 +71,7 @@ The source of truth is `magellan schema`, but the payload looks like this at a h
 
 - `terminal`: compact text with ASCII diagrams
 - `markdown`: sectioned Markdown with Mermaid blocks
-- `html`: a styled local report with the same section structure and ASCII diagrams
+- `html`: a styled local report with Mermaid diagrams and ASCII fallbacks
 
 ## Development
 
@@ -84,6 +86,7 @@ Run locally with:
 
 ```bash
 cargo run -- schema
+cargo run -- example --preset walkthrough
 cargo run -- validate --input payload.json
 cargo run -- render --input payload.json --format html --out /tmp/magellan.html
 ```
