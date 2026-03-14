@@ -77,6 +77,7 @@ impl ValidationError {
         Self { messages }
     }
 
+    #[cfg(test)]
     pub fn messages(&self) -> &[String] {
         &self.messages
     }

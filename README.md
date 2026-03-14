@@ -4,6 +4,18 @@ Magellan is a deterministic presentation engine for AI-generated technical walkt
 
 It does not call an LLM. Instead, an agent or engineer prepares a structured payload with a short summary, paced sections, and optional diagram data. Magellan validates that payload and renders it into terminal, Markdown, or HTML output.
 
+## Install
+
+```bash
+# Homebrew (recommended)
+brew install nclandrei/tap/magellan
+
+# crates.io
+cargo install magellan-cli --locked
+```
+
+The installed command is still `magellan`.
+
 ## Current CLI
 
 ```text
@@ -118,6 +130,7 @@ Build and verify with:
 
 ```bash
 cargo fmt
+cargo clippy --all-targets --all-features -- -D warnings
 cargo test
 ```
 
@@ -146,3 +159,25 @@ Magellan is intentionally narrow.
 - The output should explain behavior, not just changed files.
 
 That boundary keeps the tool fast, deterministic, and testable.
+
+## Release Automation
+
+Pushing to `main` triggers the release workflow. When the version in [Cargo.toml](/Users/anicolae/code/magellan/Cargo.toml) has not been released yet, the workflow will:
+
+- build native release artifacts for macOS (Intel + Apple Silicon) and Linux
+- publish the crate to crates.io as `magellan-cli`
+- update the Homebrew formula in `nclandrei/homebrew-tap`
+- publish the GitHub release
+
+If a non-draft GitHub release for the current version already exists, automatic `push` runs exit without rebuilding artifacts. For an intentional retry of the current version, use GitHub Actions `workflow_dispatch` on the `Release` workflow.
+
+Required GitHub repository secrets:
+
+- `CARGO_REGISTRY_TOKEN`: crates.io publish token for `magellan-cli`
+- `HOMEBREW_TAP_TOKEN`: GitHub token with push access to `nclandrei/homebrew-tap`
+
+Release process:
+
+1. Update `version` in [Cargo.toml](/Users/anicolae/code/magellan/Cargo.toml).
+2. Land the change on `main`.
+3. Let the release workflow tag and publish that version automatically.

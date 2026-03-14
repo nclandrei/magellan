@@ -1,7 +1,19 @@
 [package]
-name = "magellan"
-version = "0.1.1"
+name = "magellan-cli"
+version = "0.1.2"
 edition = "2024"
+description = "Deterministic presentation engine for AI-generated technical walkthroughs"
+license = "MIT"
+repository = "https://github.com/nclandrei/magellan"
+homepage = "https://github.com/nclandrei/magellan"
+readme = "README.md"
+authors = ["Andrei Nicolae"]
+keywords = ["ai", "agent", "cli", "walkthrough", "visualization"]
+categories = ["command-line-utilities", "development-tools"]
+
+[[bin]]
+name = "magellan"
+path = "src/main.rs"
 
 [dependencies]
 anyhow = "1.0.100"

@@ -9,9 +9,12 @@ Magellan is a deterministic presentation engine. It does not inspect a repositor
 ## Current Architecture
 
 - `src/main.rs`: CLI entrypoint and file/stdin IO
-- `src/lib.rs`: public exports for the crate
 - `src/model.rs`: payload types and validation rules
 - `src/render.rs`: schema generation plus terminal/Markdown/HTML renderers
+- `.github/workflows/ci.yml`: CI checks for formatting, clippy, packaging, tests, and release config
+- `.github/workflows/release.yml`: automated tagging, GitHub release publishing, crates.io publishing, and Homebrew tap updates
+- `scripts/smoke-test-installed-magellan.sh`: release smoke test for the built binary or tarball
+- `scripts/generate-homebrew-formula.sh`: generate the Homebrew formula from release artifact checksums
 - `examples/*.json`: realistic fixture payloads for end-to-end usage and testing
 - `tests/cli.rs`: integration coverage for the executable
 - `PLAN.md`: product and architecture notes from initial discovery
@@ -26,6 +29,7 @@ Magellan is a deterministic presentation engine. It does not inspect a repositor
 - Keep `help.txt` aligned with the real CLI. Top-level `magellan --help` should print that checked-in file directly, Showboat-style. `magellan guide` is only an explicit alias.
 - Remember that HTML now defaults to book view: one summary page, then one page per section, with an overview toggle in the same report.
 - Book-mode diagrams are expandable, so they should stay technically dense enough to merit the larger modal view.
+- Keep package metadata and release workflows aligned. The crates.io package name is `magellan-cli`, but the installed binary and Homebrew formula stay `magellan`.
 - Add tests whenever changing schema rules, CLI behavior, or renderers.
 
 ## Development Commands
@@ -34,7 +38,9 @@ Use these commands for the main feedback loop:
 
 ```bash
 cargo fmt
+cargo clippy --all-targets --all-features -- -D warnings
 cargo test
+cargo package --locked
 ```
 
 Useful manual checks:

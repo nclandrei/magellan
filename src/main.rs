@@ -1,3 +1,7 @@
+mod examples;
+mod model;
+mod render;
+
 use std::ffi::OsStr;
 use std::fs;
 use std::io::{self, Read};
@@ -8,9 +12,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand, ValueEnum};
 
-use magellan::{
-    Document, ExamplePreset, OutputFormat, example_document, render_document, schema_json,
-};
+use examples::{ExamplePreset, example_document};
+use model::Document;
+use render::{OutputFormat, render_document, schema_json};
 
 const DEFAULT_TOPIC: &str = "what we built in this task";
 const AGENT_GUIDE: &str = include_str!("../help.txt");
