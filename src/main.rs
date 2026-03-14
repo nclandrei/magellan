@@ -1,3 +1,4 @@
+use std::ffi::OsStr;
 use std::fs;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
@@ -15,55 +16,10 @@ const DEFAULT_TOPIC: &str = "what we built in this task";
 const AGENT_GUIDE: &str = include_str!("../help.txt");
 
 const AFTER_HELP: &str = "\
-Magellan is a deterministic presentation engine for AI-generated walkthroughs.
+Top-level `magellan --help` prints the full checked-in agent playbook from `help.txt`.
 
-Agent workflow:
-  1. Choose the right source of evidence and goal for the artifact you want.
-  2. Run `magellan schema` and optionally `magellan example --preset walkthrough`.
-  3. Create a JSON payload with short summaries, short sections, and optional diagrams.
-  4. Validate it with `magellan validate --input WALKTHROUGH.json`.
-  5. Render it with `magellan render --input WALKTHROUGH.json --format html --open`.
-
-Rules:
-  - explain behavior, not file churn
-  - keep the summary to 1-2 short paragraphs
-  - keep sections to 3-6 focused chunks
-  - keep paragraph text short
-  - in HTML, each section becomes a page in book view
-  - use evidence from code, diffs, tests, and session history
-
-Fast paths:
-  Learn the payload contract:
-    magellan schema
-  Read the full agent playbook:
-    magellan guide
-  Start from a built-in preset:
-    magellan example --preset timeline
-  Study a realistic fixture:
-    magellan render --input examples/session-walkthrough.json --format html --open
-
-Diagram picking cheat sheet:
-  sequence         Request or actor-by-actor interaction flow
-  flow             Branching logic or state movement
-  component_graph  Steady-state relationships between modules or layers
-  timeline         Ordered work, debugging steps, or event progression
-  before_after     User-visible behavior change
-
-Agent-specific prompt templates:
-  magellan prompt --agent-type codex
-  magellan prompt --agent-type claude --source session --goal walkthrough
-  magellan prompt --agent-type codex --source diff --goal followup --question \"why did this flow change?\"
-  magellan prompt --agent-type codex --source branch --goal handoff --scope backend --scope tests --focus verification --focus decisions
-
-Checked-in reference payloads:
-  examples/session-walkthrough.json
-  examples/branch-handoff-timeline.json
-  examples/followup-validation-question.json
-
-Full agent playbook:
-  `magellan guide` prints the checked-in `help.txt` so an agent can discover it from `--help` and read it directly after install.
-
-Use `--input -` to read JSON from stdin.";
+Use `magellan <command> --help` when you need command-specific workflow guidance.
+Use `magellan guide` if you want the same top-level playbook through an explicit command.";
 
 const PROMPT_AFTER_HELP: &str = "\
 Examples:
@@ -94,7 +50,8 @@ Reference outputs:
   examples/branch-handoff-timeline.json
   examples/followup-validation-question.json
 
-Need the longer agent playbook:
+Need the full Magellan playbook:
+  magellan --help
   magellan guide";
 
 const SCHEMA_AFTER_HELP: &str = "\
@@ -302,6 +259,11 @@ impl From<CliExamplePreset> for ExamplePreset {
 }
 
 fn main() -> Result<()> {
+    if should_print_top_level_help() {
+        print!("{AGENT_GUIDE}");
+        return Ok(());
+    }
+
     let cli = Cli::parse();
 
     match cli.command {
@@ -370,6 +332,20 @@ fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn should_print_top_level_help() -> bool {
+    let mut args = std::env::args_os();
+    let _binary = args.next();
+    let first = args.next();
+    let second = args.next();
+
+    match (first.as_deref(), second.as_deref()) {
+        (None, None) => true,
+        (Some(flag), None) if flag == OsStr::new("--help") || flag == OsStr::new("-h") => true,
+        (Some(command), None) if command == OsStr::new("help") => true,
+        _ => false,
+    }
 }
 
 struct PromptOptions<'a> {

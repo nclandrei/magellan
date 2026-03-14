@@ -19,7 +19,8 @@ magellan render --input payload.json --format html --open
 ```
 
 Use `--input -` to read a JSON payload from stdin.
-Use `magellan guide` when you want the longer checked-in agent playbook that top-level `--help` points to.
+Use `magellan --help` when you want the long-form checked-in agent playbook, Showboat-style.
+Use `magellan guide` if you want that same playbook via an explicit command.
 Use `magellan example --preset walkthrough` when you want a starter payload to edit.
 Use `magellan prompt --agent-type codex` or `magellan prompt --agent-type claude` when you want Magellan to teach an agent the workflow directly.
 Use `magellan <command> --help` when you want workflow-oriented guidance for that exact step, not just flags.

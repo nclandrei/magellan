@@ -23,7 +23,7 @@ Magellan is a deterministic presentation engine. It does not inspect a repositor
 - Optimize for short, paced walkthroughs rather than exhaustive prose.
 - Explain behavior and flow, not file churn.
 - Keep `--help` outputs instructional for agents: each command should teach the workflow, not only list flags.
-- Keep `help.txt` aligned with the real CLI. Top-level `--help` should point agents to `magellan guide`, which prints that checked-in file.
+- Keep `help.txt` aligned with the real CLI. Top-level `magellan --help` should print that checked-in file directly, Showboat-style. `magellan guide` is only an explicit alias.
 - Remember that HTML now defaults to book view: one summary page, then one page per section, with an overview toggle in the same report.
 - Book-mode diagrams are expandable, so they should stay technically dense enough to merit the larger modal view.
 - Add tests whenever changing schema rules, CLI behavior, or renderers.
