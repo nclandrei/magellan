@@ -1,128 +1,260 @@
 # Magellan
 
-Magellan is a deterministic presentation engine for AI-generated technical walkthroughs.
+[![Crates.io](https://img.shields.io/crates/v/magellan-cli.svg)](https://crates.io/crates/magellan-cli)
+[![Changelog](https://img.shields.io/github/v/release/nclandrei/magellan?include_prereleases&label=changelog)](https://github.com/nclandrei/magellan/releases)
+[![CI](https://github.com/nclandrei/magellan/actions/workflows/ci.yml/badge.svg)](https://github.com/nclandrei/magellan/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/nclandrei/magellan/blob/main/LICENSE)
 
-It does not call an LLM. Instead, an agent or engineer prepares a structured payload with a short summary, paced sections, and optional diagram data. Magellan validates that payload and renders it into terminal, Markdown, or HTML output.
+Render structured technical walkthroughs into terminal, Markdown, or HTML.
 
-## Install
+Magellan is a deterministic presentation engine for AI-generated walkthroughs. An agent or engineer gathers evidence, writes a structured JSON payload, then uses Magellan to validate and render it. Magellan does not inspect a repository by itself, and it does not call an LLM.
+
+Use it when you want a walkthrough that explains behavior, flow, architecture, timing, and verification instead of narrating file churn. HTML output defaults to a paced book view: one summary page, one page per section, an overview toggle, and expandable diagrams.
+
+## Installation
+
+Install with Homebrew:
 
 ```bash
-# Homebrew (recommended)
 brew install nclandrei/tap/magellan
+```
 
-# crates.io
+Install from crates.io:
+
+```bash
 cargo install magellan-cli --locked
 ```
 
-The installed command is still `magellan`.
+The crate name is `magellan-cli`. The installed command is `magellan`.
 
-## Current CLI
+Compiled macOS and Linux tarballs are available on the [GitHub releases page](https://github.com/nclandrei/magellan/releases).
+
+## Recommended usage
+
+The intended pattern is simple: a human points an agent at Magellan, and Magellan teaches the agent how to produce the artifact.
+
+Start by telling the agent to run `magellan --help`. That help text is the checked-in playbook. It explains the payload shape, the evidence model, the diagram choices, and the normal validate-then-render flow.
+
+For example, a human can say:
 
 ```text
-magellan schema
-magellan guide
-magellan prompt --agent-type codex --source session --goal walkthrough
-magellan example --preset walkthrough
-magellan validate --input payload.json
-magellan render --input payload.json --format terminal
-magellan render --input payload.json --format markdown
-magellan render --input payload.json --format html --out /tmp/magellan.html
-magellan render --input payload.json --format html --open
+Run `magellan --help`, then use Magellan to create a walkthrough for this change.
+Use the current diff as evidence.
+Write the payload to /tmp/magellan.json, validate it, and render Markdown to /tmp/magellan.md.
+Explain behavior and verification, not file churn.
 ```
 
-Use `--input -` to read a JSON payload from stdin.
-Use `magellan --help` when you want the long-form checked-in agent playbook, Showboat-style.
-Use `magellan guide` if you want that same playbook via an explicit command.
-Use `magellan example --preset walkthrough` when you want a starter payload to edit.
-Use `magellan prompt --agent-type codex` or `magellan prompt --agent-type claude` when you want Magellan to teach an agent the workflow directly.
-Use `magellan <command> --help` when you want workflow-oriented guidance for that exact step, not just flags.
-Use `--source` and `--goal` on `magellan prompt` when you want the template to match where the evidence comes from and what artifact the agent should produce.
-Use `--question` when the walkthrough should answer a specific question directly instead of only expanding a topic.
-Use `--scope` when the walkthrough should stay inside a specific subsystem, layer, route, or flow.
-Use the checked-in JSON fixtures under `examples/` when you want realistic end-to-end payloads instead of starter content.
+If you want Magellan to generate the agent prompt for you, use `magellan prompt`:
 
-## Why This Exists
+```bash
+magellan prompt --agent-type codex --source diff --goal walkthrough
+magellan prompt --agent-type codex --source diff --goal followup --question "why did this flow change?"
+magellan prompt --agent-type claude --source branch --goal handoff --scope backend --scope tests
+```
 
-Normal agent explanations often fail in one of two ways:
+## Help
 
-- they dump a wall of text that is hard to follow
-- they focus on file churn instead of behavior
+```text
+magellan - Render structured technical walkthroughs into terminal, markdown, or HTML output.
 
-Magellan pushes the output into a better shape:
+Magellan is a deterministic presentation engine for AI-generated walkthroughs.
+It does not inspect a repository by itself and it does not call an LLM.
+An agent or engineer gathers evidence, writes a structured JSON payload, and
+then uses Magellan to validate and render that payload.
 
-- 1-2 short summary paragraphs
-- 3-6 sections
-- short section text instead of essays
-- diagrams when they help explain flow, architecture, timing, or before/after changes
-- HTML reports default to a book-style view so engineers see one technical slice at a time instead of one long wall of text
+Usage:
+  magellan schema
+  magellan prompt --agent-type <codex|claude> [--source <session|diff|branch|pr>] [--goal <walkthrough|followup|handoff>] [options]
+  magellan example --preset <walkthrough|timeline|before-after>
+  magellan validate --input <payload.json|->
+  magellan render --input <payload.json|-> --format <terminal|markdown|html> [--out <path>] [--open]
+  magellan guide
 
-## Payload Shape
+Commands:
+  schema    Print the JSON Schema for Magellan's input payload.
+  prompt    Print an agent-oriented prompt template for producing a Magellan walkthrough.
+  example   Print a starter payload that agents can edit before rendering.
+  validate  Validate a JSON payload without rendering it.
+  render    Render a JSON payload into terminal, markdown, or HTML output.
+  guide     Print this help text.
 
-The source of truth is `magellan schema`, but the payload looks like this at a high level:
+Global options:
+  -h, --help     Print this help text.
+  -V, --version  Print version.
+
+Core rule:
+  Explain behavior, flow, architecture, timeline, or verification.
+  Do not narrate file churn.
+
+Normal workflow:
+  1. Decide what evidence you are using.
+     - persisted session transcripts, tool actions, and timestamps
+     - current diff or commit range
+     - branch compared to trunk
+     - pull request description, comments, and diff
+  2. Learn the payload contract.
+     - run: `magellan schema`
+     - optional starter payload: `magellan example --preset walkthrough`
+  3. Write a JSON payload with:
+     - `title`
+     - `summary`
+     - `sections`
+     - optional `verification`
+  4. Validate the payload.
+     - run: `magellan validate --input /tmp/magellan.json`
+  5. Render the final artifact.
+     - terminal: `magellan render --input /tmp/magellan.json --format terminal`
+     - markdown: `magellan render --input /tmp/magellan.json --format markdown`
+     - html: `magellan render --input /tmp/magellan.json --format html --open`
+
+Session evidence:
+  When the evidence source is a prior coding session:
+  - inspect persisted session transcripts before using git history as a proxy
+  - Codex usually stores them under `$CODEX_HOME/sessions/YYYY/MM/DD/*.jsonl` and commonly `~/.codex/sessions/...`
+  - Claude Code usually stores per-project transcripts under `~/.claude/projects/<workspace-slug>/<session-id>.jsonl` and uses `sessions-index.json` to help locate them
+  - stay scoped to the current workspace or clearly relevant session
+  - if transcript persistence is unavailable, say that explicitly and label any diff or commit reconstruction as fallback evidence, not the session itself
+
+Content rules:
+  - Keep the summary to 1-2 short paragraphs.
+  - Keep sections to 3-6 focused chunks.
+  - Keep section text short.
+  - In HTML, each section becomes a page in book view.
+  - In book view, diagrams can be clicked to enlarge.
+  - Use diagrams only when they make the technical explanation easier to follow.
+  - Ground the content in real evidence from code, diffs, tests, and persisted session history.
+
+Diagram picking:
+  sequence         Request or actor-by-actor interaction flow
+  flow             Branching logic or state movement
+  component_graph  Steady-state relationships between modules or layers
+  timeline         Ordered work, debugging steps, or event progression
+  before_after     User-visible behavior change
+
+Prompt workflow:
+  Use `magellan prompt` when you want Magellan to teach the agent how to build
+  the payload.
+
+  Useful prompt knobs:
+  - `--source`: where the evidence comes from
+  - `--goal`: broad walkthrough, follow-up answer, or engineer handoff
+  - `--question`: a narrow question to answer directly
+  - `--scope`: keep the artifact inside a subsystem, route, or flow
+  - `--focus`: emphasize behavior, architecture, timeline, verification, or decisions
+
+  Examples:
+  - `magellan prompt --agent-type codex`
+  - `magellan prompt --agent-type codex --source session --goal walkthrough`
+  - `magellan prompt --agent-type codex --source diff --goal followup --question "why did this flow change?"`
+  - `magellan prompt --agent-type claude --source branch --goal handoff --scope backend --scope tests --focus verification --focus decisions`
+
+Render targets:
+  terminal  Best for in-chat or terminal output with ASCII diagrams
+  markdown  Best for chat messages, docs, or PR comments with Mermaid blocks
+  html      Best for a paced visual walkthrough
+
+HTML behavior:
+  HTML reports are self-contained and open in book view by default.
+
+  Book view:
+  - starts with the summary
+  - shows one technical slice per page
+  - supports page navigation
+  - lets the user click diagrams to enlarge them
+
+  Overview view:
+  - shows the full walkthrough as one stacked report
+
+Reference files:
+  Use these checked-in payloads when you want realistic examples:
+  - `examples/session-walkthrough.json`
+  - `examples/branch-handoff-timeline.json`
+  - `examples/followup-validation-question.json`
+
+Fast paths:
+  Learn the contract:
+  - `magellan schema`
+
+  Start from a built-in preset:
+  - `magellan example --preset timeline`
+
+  Study a realistic HTML report:
+  - `magellan render --input examples/session-walkthrough.json --format html --open`
+
+  Answer a focused follow-up:
+  - `magellan prompt --agent-type codex --source diff --goal followup --question "why did this API flow change?"`
+
+  Prepare a handoff:
+  - `magellan prompt --agent-type claude --source branch --goal handoff --scope backend --scope tests`
+```
+
+## Example
+
+Start with a built-in payload, validate it, then render it in the format you need:
+
+```bash
+magellan example --preset walkthrough > walkthrough.json
+magellan validate --input walkthrough.json
+magellan render --input walkthrough.json --format terminal
+magellan render --input walkthrough.json --format markdown > walkthrough.md
+magellan render --input walkthrough.json --format html --out /tmp/magellan.html --open
+```
+
+`--input -` reads JSON from stdin, so an agent can pipe a payload directly into `validate` or `render`.
+
+## Payload shape
+
+`magellan schema` is the source of truth, but the JSON looks like this at a high level:
 
 ```json
 {
-  "title": "Order validation moved earlier",
+  "title": "Checkout validation moved before order submission",
   "summary": [
-    "The UI now validates required fields before sending the network request."
+    "Invalid carts now fail locally before the order request is built."
   ],
   "sections": [
     {
       "title": "Request flow",
       "text": [
-        "The form blocks invalid submissions locally.",
-        "Valid submissions still reach the API."
+        "The checkout page validates the cart before it assembles the API payload."
       ],
       "diagram": {
         "type": "sequence",
-        "nodes": ["User", "Form", "API"],
+        "nodes": ["User", "Checkout Page", "Validation Gate", "Orders API"],
         "edges": [
-          { "from": "User", "to": "Form", "label": "submit" },
-          { "from": "Form", "to": "API", "label": "valid request" }
+          { "from": "User", "to": "Checkout Page", "label": "submit" },
+          { "from": "Checkout Page", "to": "Validation Gate", "label": "check cart" },
+          { "from": "Validation Gate", "to": "Orders API", "label": "valid payload" }
         ]
       }
     }
   ],
   "verification": {
     "text": [
-      "Automated tests covered the regression."
+      "A regression test covers invalid submissions before any network request."
     ]
   }
 }
 ```
 
-## Render Targets
+Magellan currently supports `sequence`, `flow`, `component_graph`, `timeline`, and `before_after` diagrams.
 
-- `terminal`: compact text with ASCII diagrams
-- `markdown`: sectioned Markdown with Mermaid blocks
-- `html`: a styled local report with self-contained inline diagrams, a page-by-page book view, an overview toggle, and clickable enlarged diagrams in book mode
+## Included examples
 
-When you pass `--open` with `--format html`, Magellan writes the report and opens it in the default browser. If `--out` is omitted, Magellan creates a temp file automatically.
-In HTML, the summary becomes the opening page and each section becomes its own page, so the agent should keep one idea per section.
-In book view, clicking a diagram opens a larger modal so the technical detail is readable without leaving the current page.
+The repository ships with compact example payloads you can validate and render directly:
 
-## Example Reports
+- [`examples/session-walkthrough.json`](examples/session-walkthrough.json)
+- [`examples/branch-handoff-timeline.json`](examples/branch-handoff-timeline.json)
+- [`examples/followup-validation-question.json`](examples/followup-validation-question.json)
 
-Magellan now ships with realistic fixture payloads that show the intended output shape:
-
-- `examples/session-walkthrough.json`: a multi-section session explainer with sequence, flow, and component diagrams
-- `examples/branch-handoff-timeline.json`: a branch handoff artifact with a timeline and steady-state flow
-- `examples/followup-validation-question.json`: a narrow follow-up explainer with flow and before/after diagrams
-
-End-to-end example:
+For example:
 
 ```bash
-cargo run -- validate --input examples/session-walkthrough.json
-cargo run -- render --input examples/session-walkthrough.json --format terminal
-cargo run -- render --input examples/session-walkthrough.json --format markdown
-cargo run -- render --input examples/session-walkthrough.json --format html --open
+magellan validate --input examples/session-walkthrough.json
+magellan render --input examples/session-walkthrough.json --format terminal
+magellan render --input examples/session-walkthrough.json --format markdown > walkthrough.md
+magellan render --input examples/session-walkthrough.json --format html --out /tmp/magellan.html --open
 ```
-
-That loop is the current reference path for a real payload:
-
-1. agent writes JSON
-2. `magellan validate` checks pacing and diagram structure
-3. `magellan render` turns it into terminal, Markdown, or HTML output
 
 ## Development
 
@@ -132,52 +264,23 @@ Build and verify with:
 cargo fmt
 cargo clippy --all-targets --all-features -- -D warnings
 cargo test
+cargo package --locked
 ```
 
-Run locally with:
+Useful local commands:
 
 ```bash
 cargo run -- schema
 cargo run -- guide
 cargo run -- prompt --agent-type codex --source session --goal walkthrough
-cargo run -- prompt --agent-type codex --source diff --goal followup --question "why did this change?"
-cargo run -- prompt --agent-type claude --source branch --goal handoff --scope backend --scope tests
+cargo run -- prompt --agent-type codex --source diff --goal followup --question "why did this flow change?"
+cargo run -- prompt --agent-type claude --source branch --goal handoff --scope backend --scope tests --artifact /tmp/handoff.json
 cargo run -- example --preset walkthrough
-cargo run -- validate --input examples/branch-handoff-timeline.json
-cargo run -- render --input examples/followup-validation-question.json --format markdown
-cargo run -- validate --input payload.json
-cargo run -- render --input payload.json --format html --out /tmp/magellan.html
-cargo run -- render --input payload.json --format html --open
+cargo run -- validate --input examples/session-walkthrough.json
+cargo run -- render --input examples/branch-handoff-timeline.json --format markdown
+cargo run -- render --input examples/followup-validation-question.json --format html --out /tmp/magellan-question.html
 ```
 
-## Design Boundary
+## Release
 
-Magellan is intentionally narrow.
-
-- The agent decides what changed and how to explain it.
-- Magellan validates the structure and renders it predictably.
-- The output should explain behavior, not just changed files.
-
-That boundary keeps the tool fast, deterministic, and testable.
-
-## Release Automation
-
-Pushing to `main` triggers the release workflow. When the version in [Cargo.toml](/Users/anicolae/code/magellan/Cargo.toml) has not been released yet, the workflow will:
-
-- build native release artifacts for macOS (Intel + Apple Silicon) and Linux
-- publish the crate to crates.io as `magellan-cli`
-- update the Homebrew formula in `nclandrei/homebrew-tap`
-- publish the GitHub release
-
-If a non-draft GitHub release for the current version already exists, automatic `push` runs exit without rebuilding artifacts. For an intentional retry of the current version, use GitHub Actions `workflow_dispatch` on the `Release` workflow.
-
-Required GitHub repository secrets:
-
-- `CARGO_REGISTRY_TOKEN`: crates.io publish token for `magellan-cli`
-- `HOMEBREW_TAP_TOKEN`: GitHub token with push access to `nclandrei/homebrew-tap`
-
-Release process:
-
-1. Update `version` in [Cargo.toml](/Users/anicolae/code/magellan/Cargo.toml).
-2. Land the change on `main`.
-3. Let the release workflow tag and publish that version automatically.
+Pushing `main` triggers the release workflow. When the version in `Cargo.toml` has not already been published, the workflow tags the release, uploads macOS and Linux artifacts, publishes `magellan-cli` to crates.io, and updates the Homebrew formula in `nclandrei/homebrew-tap`.
