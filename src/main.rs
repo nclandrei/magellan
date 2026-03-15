@@ -37,10 +37,16 @@ Goals:
   handoff      Prepare another engineer to pick up the work quickly.
 
 Sources:
-  session      Use session messages, tool actions, and timestamps.
+  session      Use persisted session transcripts, tool actions, and timestamps first.
   diff         Use the active diff or commit range as the main evidence.
   branch       Compare the current branch to trunk.
   pr           Use pull request description, comments, and diff.
+
+Session-source reminders:
+  - Check Codex transcripts under `$CODEX_HOME/sessions/YYYY/MM/DD/*.jsonl` (usually `~/.codex/sessions/...`).
+  - Check Claude Code transcripts under `~/.claude/projects/<workspace-slug>/<session-id>.jsonl` and use `sessions-index.json` to find the right one.
+  - Stay scoped to the current workspace.
+  - If transcript evidence is unavailable, say that explicitly and label any diff or commit reconstruction as fallback evidence, not the session itself.
 
 Diagram picking:
   sequence         Request or actor-by-actor interaction flow
@@ -599,7 +605,7 @@ fn prompt_focus_guidance(focuses: &[CliPromptFocus]) -> String {
 fn prompt_source_guidance(source: CliPromptSource) -> &'static str {
     match source {
         CliPromptSource::Session => {
-            "- inspect session messages, tool actions, and timestamps to reconstruct intent and sequence"
+            "- inspect persisted session transcripts, tool actions, and timestamps before using git history as a proxy\n- for Codex, check `$CODEX_HOME/sessions/YYYY/MM/DD/*.jsonl` first; `~/.codex/sessions/...` is the usual default\n- for Claude Code, check `~/.claude/projects/<workspace-slug>/<session-id>.jsonl` and `sessions-index.json` to find the right project transcript\n- stay scoped to the current workspace or explicitly relevant session\n- if transcript persistence is unavailable, say that explicitly and label any diff or commit reconstruction as fallback evidence, not as the session itself"
         }
         CliPromptSource::Diff => {
             "- inspect the current diff or commit range and use it as the main evidence for what changed"

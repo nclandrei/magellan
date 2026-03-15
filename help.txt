@@ -31,7 +31,7 @@ Core rule:
 
 Normal workflow:
   1. Decide what evidence you are using.
-     - session messages, tool actions, and timestamps
+     - persisted session transcripts, tool actions, and timestamps
      - current diff or commit range
      - branch compared to trunk
      - pull request description, comments, and diff
@@ -50,6 +50,14 @@ Normal workflow:
      - markdown: `magellan render --input /tmp/magellan.json --format markdown`
      - html: `magellan render --input /tmp/magellan.json --format html --open`
 
+Session evidence:
+  When the evidence source is a prior coding session:
+  - inspect persisted session transcripts before using git history as a proxy
+  - Codex usually stores them under `$CODEX_HOME/sessions/YYYY/MM/DD/*.jsonl` and commonly `~/.codex/sessions/...`
+  - Claude Code usually stores per-project transcripts under `~/.claude/projects/<workspace-slug>/<session-id>.jsonl` and uses `sessions-index.json` to help locate them
+  - stay scoped to the current workspace or clearly relevant session
+  - if transcript persistence is unavailable, say that explicitly and label any diff or commit reconstruction as fallback evidence, not the session itself
+
 Content rules:
   - Keep the summary to 1-2 short paragraphs.
   - Keep sections to 3-6 focused chunks.
@@ -57,7 +65,7 @@ Content rules:
   - In HTML, each section becomes a page in book view.
   - In book view, diagrams can be clicked to enlarge.
   - Use diagrams only when they make the technical explanation easier to follow.
-  - Ground the content in real evidence from code, diffs, tests, and session history.
+  - Ground the content in real evidence from code, diffs, tests, and persisted session history.
 
 Diagram picking:
   sequence         Request or actor-by-actor interaction flow

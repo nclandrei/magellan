@@ -58,8 +58,15 @@ fn help_mentions_prompt_workflow() {
         .stdout(predicate::str::contains("Usage:"))
         .stdout(predicate::str::contains("Commands:"))
         .stdout(predicate::str::contains("Normal workflow:"))
+        .stdout(predicate::str::contains("Session evidence:"))
         .stdout(predicate::str::contains("Fast paths:"))
         .stdout(predicate::str::contains("Prompt workflow:"))
+        .stdout(predicate::str::contains(
+            "$CODEX_HOME/sessions/YYYY/MM/DD/*.jsonl",
+        ))
+        .stdout(predicate::str::contains(
+            "~/.claude/projects/<workspace-slug>/<session-id>.jsonl",
+        ))
         .stdout(predicate::str::contains(
             "In HTML, each section becomes a page in book view.",
         ))
@@ -115,7 +122,10 @@ fn prompt_command_prints_codex_template() {
         ))
         .stdout(predicate::str::contains("magellan schema"))
         .stdout(predicate::str::contains(
-            "inspect session messages, tool actions, and timestamps",
+            "inspect persisted session transcripts, tool actions, and timestamps",
+        ))
+        .stdout(predicate::str::contains(
+            "label any diff or commit reconstruction as fallback evidence",
         ))
         .stdout(predicate::str::contains(
             "produce a broad technical walkthrough that covers the full change without drifting into fluff",
@@ -141,6 +151,8 @@ fn prompt_help_mentions_source_and_goal_options() {
         .stdout(predicate::str::contains("--scope <SCOPE>"))
         .stdout(predicate::str::contains("Goals:"))
         .stdout(predicate::str::contains("Sources:"))
+        .stdout(predicate::str::contains("Session-source reminders:"))
+        .stdout(predicate::str::contains("sessions-index.json"))
         .stdout(predicate::str::contains("Diagram picking:"))
         .stdout(predicate::str::contains(
             "timeline         Ordered work, debugging steps, or event progression",
