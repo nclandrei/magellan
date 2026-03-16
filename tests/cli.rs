@@ -58,9 +58,23 @@ fn help_mentions_prompt_workflow() {
         .stdout(predicate::str::contains("Usage:"))
         .stdout(predicate::str::contains("Commands:"))
         .stdout(predicate::str::contains("Normal workflow:"))
+        .stdout(predicate::str::contains("Common requests:"))
         .stdout(predicate::str::contains("Session evidence:"))
         .stdout(predicate::str::contains("Fast paths:"))
         .stdout(predicate::str::contains("Prompt workflow:"))
+        .stdout(predicate::str::contains(
+            "what did the last commit implement?",
+        ))
+        .stdout(predicate::str::contains("what we built yesterday"))
+        .stdout(predicate::str::contains(
+            "what did we do on March 15, 2026?",
+        ))
+        .stdout(predicate::str::contains(
+            "what we built in the last session",
+        ))
+        .stdout(predicate::str::contains(
+            "what changed on branch <name>",
+        ))
         .stdout(predicate::str::contains(
             "$CODEX_HOME/sessions/YYYY/MM/DD/*.jsonl",
         ))
@@ -102,6 +116,7 @@ fn guide_command_prints_checked_in_agent_playbook() {
             "magellan - Render structured technical walkthroughs into terminal, markdown, or HTML output.",
         ))
         .stdout(predicate::str::contains("Normal workflow"))
+        .stdout(predicate::str::contains("Common requests"))
         .stdout(predicate::str::contains("Diagram picking"))
         .stdout(predicate::str::contains("Book view:"))
         .stdout(predicate::str::contains(

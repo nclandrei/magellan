@@ -20,7 +20,7 @@ const DEFAULT_TOPIC: &str = "what we built in this task";
 const AGENT_GUIDE: &str = include_str!("../help.txt");
 
 const AFTER_HELP: &str = "\
-Top-level `magellan --help` prints the full checked-in agent playbook from `help.txt`.
+Top-level `magellan --help` prints the full checked-in agent playbook from `help.txt`, including common request recipes for commit, branch, and session explainers.
 
 Use `magellan <command> --help` when you need command-specific workflow guidance.
 Use `magellan guide` if you want the same top-level playbook through an explicit command.";

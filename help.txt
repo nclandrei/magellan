@@ -50,6 +50,26 @@ Normal workflow:
      - markdown: `magellan render --input /tmp/magellan.json --format markdown`
      - html: `magellan render --input /tmp/magellan.json --format html --open`
 
+Common requests:
+  Explain the last commit:
+  - use the current diff or `git show HEAD` as the main evidence
+  - `magellan prompt --agent-type codex --source diff --goal followup --question "what did the last commit implement?"`
+
+  Explain what we did yesterday or on a specific day:
+  - inspect persisted session transcripts for that day first; if they are unavailable, say that and label any diff or commit reconstruction as fallback evidence
+  - `magellan prompt --agent-type codex --source session --goal walkthrough --topic "what we built yesterday"`
+  - `magellan prompt --agent-type claude --source session --goal followup --question "what did we do on March 15, 2026?"`
+
+  Explain what we did in the last session or a named session:
+  - inspect persisted Codex or Claude session transcripts first and stay scoped to the relevant session
+  - `magellan prompt --agent-type codex --source session --goal walkthrough --topic "what we built in the last session"`
+  - `magellan prompt --agent-type claude --source session --goal followup --question "what did we implement in session X?"`
+
+  Explain what changed in commit X or on branch Y:
+  - use that commit diff or branch comparison as the main evidence
+  - `magellan prompt --agent-type codex --source diff --goal followup --question "what changed in commit <sha>?"`
+  - `magellan prompt --agent-type claude --source branch --goal walkthrough --topic "what changed on branch <name>"`
+
 Session evidence:
   When the evidence source is a prior coding session:
   - inspect persisted session transcripts before using git history as a proxy
