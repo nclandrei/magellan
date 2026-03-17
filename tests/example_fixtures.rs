@@ -15,6 +15,18 @@ fn fixture_path(relative: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join(relative)
 }
 
+fn css_block<'a>(html: &'a str, selector: &str) -> &'a str {
+    let marker = format!("{selector} {{");
+    let start = html
+        .find(&marker)
+        .unwrap_or_else(|| panic!("missing CSS block for {selector}"));
+    let rest = &html[start..];
+    let end = rest
+        .find("\n    }")
+        .unwrap_or_else(|| panic!("unterminated CSS block for {selector}"));
+    &rest[..end]
+}
+
 fn fixture_cases() -> [FixtureCase; 3] {
     [
         FixtureCase {
@@ -232,6 +244,7 @@ fn session_fixture_html_includes_expected_book_paging_structure() {
     let dot_count = html.matches("data-page-dot=").count();
     let trigger_count = html.matches("class=\"diagram-hitbox\"").count();
     let template_count = html.matches("<template id=\"diagram-template-").count();
+    let book_nav_css = css_block(&html, ".book-nav");
 
     assert_eq!(page_count, 5, "summary + 3 sections + verification");
     assert_eq!(dot_count, 5, "book navigation should mirror the page count");
@@ -249,4 +262,7 @@ fn session_fixture_html_includes_expected_book_paging_structure() {
     assert!(html.contains("data-layout=\"reader\""));
     assert!(html.contains("Reader"));
     assert!(html.contains("Spread"));
+    assert!(book_nav_css.contains("width: 100%;"));
+    assert!(!book_nav_css.contains("position: fixed;"));
+    assert!(!book_nav_css.contains("position: sticky;"));
 }

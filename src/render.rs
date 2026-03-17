@@ -692,8 +692,8 @@ fn html_style() -> &'static str {
     .book-shell {
       display: grid;
       gap: 14px;
-      height: calc(100vh - 196px);
-      min-height: 640px;
+      height: calc(100vh - 180px);
+      min-height: 620px;
       grid-template-rows: minmax(0, 1fr) auto;
     }
     .book-window {
@@ -712,11 +712,11 @@ fn html_style() -> &'static str {
     .page {
       width: 100%;
       min-width: 100%;
-      padding: 30px 30px 36px;
+      padding: 26px 28px 28px;
       height: 100%;
       display: flex;
       flex-direction: column;
-      gap: 24px;
+      gap: 22px;
       overflow-y: auto;
     }
     .page-head {
@@ -756,7 +756,10 @@ fn html_style() -> &'static str {
       align-items: stretch;
     }
     .summary-title {
-      margin-bottom: 18px;
+      max-width: 12ch;
+      margin-bottom: 16px;
+      font-size: clamp(2.35rem, 4.8vw, 4.2rem);
+      line-height: 0.94;
     }
     .summary-stats {
       display: grid;
@@ -809,12 +812,7 @@ fn html_style() -> &'static str {
       justify-content: space-between;
       gap: 12px;
       padding: 12px 16px;
-      position: fixed;
-      left: 50%;
-      bottom: 18px;
-      transform: translateX(-50%);
-      width: min(960px, calc(100vw - 24px));
-      z-index: 3;
+      width: 100%;
       border-radius: 999px;
       background: rgba(8, 18, 24, 0.86);
       border: 1px solid var(--accent-line);
@@ -1056,15 +1054,13 @@ fn html_style() -> &'static str {
       .book-nav {
         flex-wrap: wrap;
         justify-content: center;
-        width: calc(100vw - 20px);
-        bottom: 10px;
       }
       .report-toolbar {
         justify-content: space-between;
       }
       .book-shell {
-        height: calc(100vh - 224px);
-        min-height: 520px;
+        height: calc(100vh - 208px);
+        min-height: 500px;
       }
     }
     @media (max-width: 560px) {
@@ -1077,6 +1073,10 @@ fn html_style() -> &'static str {
       .page {
         border-radius: 20px;
         padding: 20px;
+      }
+      .summary-title {
+        max-width: none;
+        font-size: clamp(2.15rem, 10vw, 3.35rem);
       }
       .summary-stats {
         grid-template-columns: 1fr 1fr;
@@ -1094,6 +1094,10 @@ fn html_style() -> &'static str {
       }
       .page-label {
         max-width: none;
+      }
+      .book-shell {
+        height: calc(100vh - 198px);
+        min-height: 460px;
       }
       .layout-toggle-group {
         display: grid;
@@ -1956,6 +1960,18 @@ mod tests {
     use crate::model::{Diagram, Document, Edge, Section, Verification};
     use crate::{ExamplePreset, example_document};
 
+    fn css_block<'a>(html: &'a str, selector: &str) -> &'a str {
+        let marker = format!("{selector} {{");
+        let start = html
+            .find(&marker)
+            .unwrap_or_else(|| panic!("missing CSS block for {selector}"));
+        let rest = &html[start..];
+        let end = rest
+            .find("\n    }")
+            .unwrap_or_else(|| panic!("unterminated CSS block for {selector}"));
+        &rest[..end]
+    }
+
     fn sample_document() -> Document {
         Document {
             title: "Magellan demo".into(),
@@ -2012,6 +2028,7 @@ mod tests {
     #[test]
     fn renders_html_panels() {
         let rendered = render_document(&sample_document(), OutputFormat::Html);
+        let book_nav_css = css_block(&rendered, ".book-nav");
 
         assert!(rendered.contains("<!DOCTYPE html>"));
         assert!(rendered.contains("Magellan walkthrough"));
@@ -2036,6 +2053,9 @@ mod tests {
         assert!(rendered.contains("color-scheme: dark;"));
         assert!(!rendered.contains("color-scheme: light;"));
         assert!(!rendered.contains("cdn.jsdelivr"));
+        assert!(book_nav_css.contains("width: 100%;"));
+        assert!(!book_nav_css.contains("position: fixed;"));
+        assert!(!book_nav_css.contains("position: sticky;"));
     }
 
     #[test]
