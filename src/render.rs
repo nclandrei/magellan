@@ -136,7 +136,15 @@ fn render_html(document: &Document) -> String {
         .as_ref()
         .map(|verification| {
             format!(
-                "<section class=\"panel\"><h2>Verification</h2>{}</section>",
+                "<section class=\"panel\">
+                  <div class=\"panel-head\">
+                    <p class=\"eyebrow\">Verification</p>
+                    <h2>Verification</h2>
+                  </div>
+                  <div class=\"panel-body\">
+                    <div class=\"panel-copy\">{}</div>
+                  </div>
+                </section>",
                 paragraphs_to_html(&verification.text)
             )
         })
@@ -153,17 +161,24 @@ fn render_html(document: &Document) -> String {
   <style>{style}</style>
 </head>
 <body>
-  <main class=\"report-shell\" data-magellan-report>
+  <main class=\"report-shell\" data-magellan-report data-layout=\"reader\">
     <header class=\"report-bar\">
       <div class=\"report-bar-copy\">
         <p class=\"eyebrow\">Magellan walkthrough</p>
         <h1>{title}</h1>
-        <p class=\"report-note\">Book view shows one technical slice at a time. Switch to overview when you want the whole walkthrough at once.</p>
+        <p class=\"report-note\">Book view now defaults to a prose-first reading layout. Switch to spread when you want diagrams to stay beside the copy, or overview when you want the whole walkthrough at once.</p>
       </div>
       <div class=\"report-toolbar\">
-        <div class=\"view-toggle-group\" role=\"tablist\" aria-label=\"Report views\">
-          <button class=\"view-toggle is-active\" type=\"button\" data-view-target=\"book\" aria-pressed=\"true\">Book View</button>
-          <button class=\"view-toggle\" type=\"button\" data-view-target=\"overview\" aria-pressed=\"false\">Overview</button>
+        <div class=\"toolbar-cluster\">
+          <div class=\"view-toggle-group\" role=\"tablist\" aria-label=\"Report views\">
+            <button class=\"view-toggle is-active\" type=\"button\" data-view-target=\"book\" aria-pressed=\"true\">Book View</button>
+            <button class=\"view-toggle\" type=\"button\" data-view-target=\"overview\" aria-pressed=\"false\">Overview</button>
+          </div>
+          <div class=\"layout-toggle-group\" role=\"group\" aria-label=\"Report layout\">
+            <span class=\"toolbar-label\">Layout</span>
+            <button class=\"layout-toggle is-active\" type=\"button\" data-layout-target=\"reader\" aria-pressed=\"true\">Reader</button>
+            <button class=\"layout-toggle\" type=\"button\" data-layout-target=\"spread\" aria-pressed=\"false\">Spread</button>
+          </div>
         </div>
         <div class=\"page-status\" aria-live=\"polite\">
           <span class=\"page-label\" data-current-page-label>Summary</span>
@@ -323,11 +338,11 @@ fn render_section_page(index: usize, total_pages: usize, section: &Section) -> S
             <p class=\"page-step\">Page {page_number} / {total_pages}</p>
           </div>
           <div class=\"page-grid\">
-            {diagram_html}
             <div class=\"page-copy\">
               <h2>{title}</h2>
               {text_html}
             </div>
+            {diagram_html}
           </div>
         </article>",
         page_class = page_class,
@@ -404,14 +419,35 @@ fn render_overview_section_html(index: usize, section: &Section) -> String {
     let diagram_html = section
         .diagram
         .as_ref()
-        .map(|diagram| render_diagram_html(index, diagram, false))
+        .map(|diagram| {
+            format!(
+                "<div class=\"panel-visual\">{}</div>",
+                render_diagram_html(index, diagram, false)
+            )
+        })
         .unwrap_or_default();
+    let panel_class = if section.diagram.is_some() {
+        "panel panel-has-diagram"
+    } else {
+        "panel"
+    };
 
     format!(
-        "<section class=\"panel\"><h2>{}</h2>{}{}</section>",
-        escape_html(&section.title),
-        paragraphs_to_html(&section.text),
-        diagram_html
+        "<section class=\"{panel_class}\">
+          <div class=\"panel-head\">
+            <p class=\"eyebrow\">Step {step}</p>
+            <h2>{title}</h2>
+          </div>
+          <div class=\"panel-body\">
+            <div class=\"panel-copy\">{text_html}</div>
+            {diagram_html}
+          </div>
+        </section>",
+        panel_class = panel_class,
+        step = index + 1,
+        title = escape_html(&section.title),
+        text_html = paragraphs_to_html(&section.text),
+        diagram_html = diagram_html
     )
 }
 
@@ -434,15 +470,24 @@ fn render_diagram_modal_shell() -> &'static str {
 fn html_style() -> &'static str {
     r#"
     :root {
-      color-scheme: light;
-      --paper: rgba(255, 252, 246, 0.94);
-      --paper-strong: rgba(255, 251, 244, 0.98);
-      --ink: #1c1917;
-      --muted: #57534e;
-      --accent: #0f766e;
-      --accent-soft: rgba(15, 118, 110, 0.12);
-      --border: rgba(28, 25, 23, 0.12);
-      --shadow: 0 24px 60px rgba(28, 25, 23, 0.12);
+      color-scheme: dark;
+      --bg-top: #071218;
+      --bg-bottom: #09161c;
+      --surface: rgba(11, 23, 31, 0.92);
+      --surface-strong: rgba(13, 27, 36, 0.98);
+      --surface-soft: rgba(16, 32, 42, 0.92);
+      --surface-elevated: rgba(17, 36, 46, 0.98);
+      --ink: #f4efe6;
+      --ink-soft: #ddd6cb;
+      --muted: #aab8bb;
+      --accent: #63d6c6;
+      --accent-strong: #8ceddf;
+      --accent-soft: rgba(99, 214, 198, 0.14);
+      --accent-line: rgba(99, 214, 198, 0.22);
+      --border: rgba(148, 191, 186, 0.18);
+      --shadow: 0 28px 72px rgba(0, 0, 0, 0.38);
+      --shadow-soft: 0 16px 42px rgba(0, 0, 0, 0.24);
+      --code-bg: #081218;
     }
     * {
       box-sizing: border-box;
@@ -454,15 +499,16 @@ fn html_style() -> &'static str {
       margin: 0;
       font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
       background:
-        radial-gradient(circle at top left, rgba(15, 118, 110, 0.18), transparent 30%),
-        linear-gradient(160deg, #f8f3eb 0%, #ece3d3 100%);
+        radial-gradient(circle at top left, rgba(99, 214, 198, 0.2), transparent 28%),
+        radial-gradient(circle at 84% 12%, rgba(226, 154, 84, 0.16), transparent 18%),
+        linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
       color: var(--ink);
     }
     body[data-diagram-modal-open="true"] {
       overflow: hidden;
     }
     .report-shell {
-      max-width: 1120px;
+      max-width: 1180px;
       margin: 0 auto;
       padding: 32px 18px 72px;
     }
@@ -470,35 +516,46 @@ fn html_style() -> &'static str {
     .hero,
     .panel,
     .page {
-      background: var(--paper);
+      background:
+        linear-gradient(180deg, rgba(18, 34, 44, 0.98) 0%, rgba(10, 21, 29, 0.98) 100%);
       border: 1px solid var(--border);
-      border-radius: 24px;
+      border-radius: 26px;
       box-shadow: var(--shadow);
-      backdrop-filter: blur(6px);
+      backdrop-filter: blur(10px);
     }
     .report-bar {
       display: grid;
-      gap: 20px;
+      gap: 22px;
+      grid-template-columns: minmax(0, 1.18fr) minmax(280px, 0.82fr);
+      align-items: end;
       margin-bottom: 22px;
-      padding: 26px;
+      padding: 28px;
     }
     .report-bar-copy {
       max-width: 760px;
     }
     .report-toolbar {
       display: flex;
-      flex-wrap: wrap;
-      align-items: center;
+      flex-direction: column;
+      align-items: flex-end;
       justify-content: space-between;
-      gap: 16px;
+      gap: 18px;
+      min-height: 100%;
+    }
+    .toolbar-cluster {
+      display: grid;
+      align-items: center;
+      justify-items: end;
+      gap: 12px;
       position: relative;
       z-index: 3;
+      width: 100%;
     }
     .eyebrow {
       text-transform: uppercase;
       letter-spacing: 0.08em;
       font-size: 0.78rem;
-      color: var(--accent);
+      color: var(--accent-strong);
       margin: 0 0 8px;
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     }
@@ -507,22 +564,27 @@ fn html_style() -> &'static str {
       margin: 0 0 12px;
       line-height: 1.05;
       font-weight: 700;
+      color: var(--ink);
     }
     h1 {
-      font-size: clamp(2rem, 5vw, 3.2rem);
+      max-width: 14ch;
+      font-size: clamp(2.35rem, 5vw, 4.1rem);
+      text-wrap: balance;
     }
     h2 {
-      font-size: clamp(1.45rem, 3vw, 2.15rem);
+      font-size: clamp(1.5rem, 3vw, 2.2rem);
+      text-wrap: balance;
     }
     p {
       margin: 0 0 14px;
       color: var(--muted);
-      font-size: 1.04rem;
-      line-height: 1.68;
+      font-size: 1.03rem;
+      line-height: 1.76;
     }
     .report-note {
-      max-width: 54ch;
+      max-width: 56ch;
       margin: 0;
+      color: var(--ink-soft);
     }
     .view-toggle-group {
       display: inline-flex;
@@ -530,28 +592,64 @@ fn html_style() -> &'static str {
       gap: 8px;
       padding: 6px;
       border-radius: 999px;
-      background: rgba(255, 255, 255, 0.66);
-      border: 1px solid rgba(15, 118, 110, 0.14);
+      background: rgba(6, 17, 24, 0.76);
+      border: 1px solid var(--accent-line);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+    }
+    .layout-toggle-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px;
+      border-radius: 999px;
+      background: rgba(6, 17, 24, 0.76);
+      border: 1px solid var(--accent-line);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+    }
+    .toolbar-label {
+      padding: 0 4px 0 8px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.74rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
     }
     .view-toggle,
+    .layout-toggle,
     .nav-button,
     .page-dot {
       appearance: none;
       border: 0;
       cursor: pointer;
-      transition: transform 140ms ease, background-color 140ms ease, color 140ms ease, opacity 140ms ease;
+      transition:
+        transform 140ms ease,
+        background-color 140ms ease,
+        color 140ms ease,
+        opacity 140ms ease,
+        border-color 140ms ease;
     }
     .view-toggle {
       padding: 10px 14px;
       border-radius: 999px;
+      border: 1px solid transparent;
       background: transparent;
       color: var(--muted);
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       font-size: 0.88rem;
     }
-    .view-toggle.is-active {
+    .layout-toggle {
+      padding: 10px 14px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.84rem;
+    }
+    .view-toggle.is-active,
+    .layout-toggle.is-active {
       background: var(--accent);
-      color: #f8fafc;
+      color: #061116;
     }
     .page-status {
       display: flex;
@@ -560,6 +658,7 @@ fn html_style() -> &'static str {
       gap: 2px;
       min-width: 132px;
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      padding-right: 4px;
     }
     .page-label {
       font-size: 0.92rem;
@@ -579,7 +678,8 @@ fn html_style() -> &'static str {
     .book-shell {
       display: grid;
       gap: 16px;
-      height: calc(100vh - 280px);
+      height: calc(100vh - 304px);
+      min-height: 560px;
       grid-template-rows: minmax(0, 1fr) auto;
     }
     .book-window {
@@ -598,11 +698,11 @@ fn html_style() -> &'static str {
     .page {
       width: 100%;
       min-width: 100%;
-      padding: 24px;
+      padding: 28px;
       height: 100%;
       display: flex;
       flex-direction: column;
-      gap: 20px;
+      gap: 24px;
       overflow-y: auto;
     }
     .page-head {
@@ -610,8 +710,8 @@ fn html_style() -> &'static str {
       align-items: center;
       justify-content: space-between;
       gap: 12px;
-      padding-bottom: 14px;
-      border-bottom: 1px solid rgba(15, 118, 110, 0.1);
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--accent-line);
     }
     .page-step {
       margin: 0;
@@ -624,15 +724,13 @@ fn html_style() -> &'static str {
     }
     .page-grid {
       display: grid;
-      gap: 20px;
+      gap: 24px;
       align-items: start;
       grid-template-columns: 1fr;
     }
-    .page.has-diagram .page-grid {
-      grid-template-columns: minmax(0, 1.08fr) minmax(280px, 0.92fr);
-    }
     .page-copy {
       min-width: 0;
+      max-width: 64ch;
     }
     .page-copy p:last-child {
       margin-bottom: 0;
@@ -641,7 +739,6 @@ fn html_style() -> &'static str {
       min-width: 0;
     }
     .summary-grid {
-      grid-template-columns: minmax(0, 1.15fr) minmax(260px, 0.85fr);
       align-items: stretch;
     }
     .summary-stats {
@@ -650,20 +747,22 @@ fn html_style() -> &'static str {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
     .stat-card {
-      background: var(--paper-strong);
-      border: 1px solid rgba(15, 118, 110, 0.14);
+      background:
+        linear-gradient(180deg, rgba(20, 40, 53, 0.98) 0%, rgba(13, 27, 36, 0.98) 100%);
+      border: 1px solid var(--accent-line);
       border-radius: 20px;
       padding: 16px;
       display: grid;
       gap: 8px;
       align-content: start;
+      box-shadow: var(--shadow-soft);
     }
     .stat-label {
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       font-size: 0.78rem;
       text-transform: uppercase;
       letter-spacing: 0.06em;
-      color: var(--accent);
+      color: var(--accent-strong);
     }
     .stat-card strong {
       font-size: 1.35rem;
@@ -677,8 +776,8 @@ fn html_style() -> &'static str {
       width: 92px;
       height: 92px;
       border-radius: 999px;
-      background: radial-gradient(circle at 30% 30%, rgba(15, 118, 110, 0.2), rgba(15, 118, 110, 0.08));
-      border: 1px solid rgba(15, 118, 110, 0.18);
+      background: radial-gradient(circle at 30% 30%, rgba(99, 214, 198, 0.24), rgba(99, 214, 198, 0.08));
+      border: 1px solid var(--accent-line);
       display: grid;
       place-items: center;
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -700,17 +799,17 @@ fn html_style() -> &'static str {
       width: min(960px, calc(100vw - 24px));
       z-index: 3;
       border-radius: 999px;
-      background: rgba(255, 252, 246, 0.9);
-      border: 1px solid rgba(15, 118, 110, 0.14);
-      box-shadow: 0 18px 40px rgba(28, 25, 23, 0.16);
+      background: rgba(8, 18, 24, 0.86);
+      border: 1px solid var(--accent-line);
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.32);
       backdrop-filter: blur(12px);
     }
     .nav-button {
       padding: 12px 18px;
       border-radius: 999px;
-      background: rgba(255, 255, 255, 0.72);
+      background: rgba(16, 34, 44, 0.9);
       color: var(--ink);
-      border: 1px solid rgba(15, 118, 110, 0.14);
+      border: 1px solid var(--accent-line);
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       font-size: 0.86rem;
     }
@@ -730,8 +829,8 @@ fn html_style() -> &'static str {
       width: 12px;
       height: 12px;
       border-radius: 999px;
-      background: rgba(15, 118, 110, 0.18);
-      border: 1px solid rgba(15, 118, 110, 0.22);
+      background: rgba(99, 214, 198, 0.18);
+      border: 1px solid rgba(99, 214, 198, 0.24);
       padding: 0;
     }
     .page-dot.is-active {
@@ -745,6 +844,21 @@ fn html_style() -> &'static str {
     .hero {
       margin-bottom: 20px;
     }
+    .panel-head {
+      margin-bottom: 18px;
+    }
+    .panel-body {
+      display: grid;
+      gap: 24px;
+      align-items: start;
+      grid-template-columns: 1fr;
+    }
+    .panel-copy {
+      max-width: 68ch;
+    }
+    .panel-copy p:last-child {
+      margin-bottom: 0;
+    }
     .stack {
       display: grid;
       gap: 20px;
@@ -752,8 +866,8 @@ fn html_style() -> &'static str {
     .diagram {
       margin-top: 0;
       border-radius: 20px;
-      border: 1px solid rgba(15, 118, 110, 0.16);
-      background: linear-gradient(180deg, rgba(248, 250, 252, 0.96) 0%, rgba(241, 245, 249, 0.94) 100%);
+      border: 1px solid var(--accent-line);
+      background: linear-gradient(180deg, rgba(10, 23, 31, 0.98) 0%, rgba(7, 17, 24, 0.98) 100%);
       padding: 18px;
     }
     .diagram-expandable .diagram-hitbox {
@@ -773,7 +887,7 @@ fn html_style() -> &'static str {
       font-weight: 600;
       letter-spacing: 0.04em;
       text-transform: uppercase;
-      color: var(--accent);
+      color: var(--accent-strong);
     }
     .diagram-stage {
       display: block;
@@ -808,7 +922,7 @@ fn html_style() -> &'static str {
       inset: 0;
       border: 0;
       padding: 0;
-      background: rgba(28, 25, 23, 0.54);
+      background: rgba(3, 9, 13, 0.72);
       backdrop-filter: blur(6px);
       cursor: pointer;
     }
@@ -819,9 +933,9 @@ fn html_style() -> &'static str {
       max-height: calc(100vh - 24px);
       overflow: auto;
       border-radius: 28px;
-      border: 1px solid rgba(15, 118, 110, 0.16);
-      background: var(--paper-strong);
-      box-shadow: 0 28px 70px rgba(28, 25, 23, 0.28);
+      border: 1px solid var(--accent-line);
+      background: var(--surface-strong);
+      box-shadow: 0 28px 70px rgba(0, 0, 0, 0.4);
       padding: 24px;
     }
     .diagram-modal-header {
@@ -838,8 +952,8 @@ fn html_style() -> &'static str {
     }
     .diagram-modal-figure {
       border-radius: 20px;
-      border: 1px solid rgba(15, 118, 110, 0.16);
-      background: linear-gradient(180deg, rgba(248, 250, 252, 0.98) 0%, rgba(241, 245, 249, 0.96) 100%);
+      border: 1px solid var(--accent-line);
+      background: linear-gradient(180deg, rgba(10, 23, 31, 0.98) 0%, rgba(7, 17, 24, 0.98) 100%);
       padding: 18px;
     }
     .diagram-modal-figure svg {
@@ -852,7 +966,7 @@ fn html_style() -> &'static str {
       margin-top: 14px;
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       font-size: 0.82rem;
-      color: var(--accent);
+      color: var(--accent-strong);
     }
     details {
       margin-top: 16px;
@@ -860,30 +974,62 @@ fn html_style() -> &'static str {
     summary {
       cursor: pointer;
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      color: var(--accent);
+      color: var(--accent-strong);
       font-size: 0.88rem;
     }
     pre {
       margin: 18px 0 0;
       padding: 18px;
       border-radius: 16px;
-      border: 1px solid rgba(15, 118, 110, 0.2);
-      background: #f8fafc;
+      border: 1px solid var(--accent-line);
+      background: var(--code-bg);
       overflow-x: auto;
-      color: #0f172a;
+      color: #d8e6e4;
       font-size: 0.95rem;
       line-height: 1.4;
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     }
+    .report-shell[data-layout="spread"] .summary-grid {
+      grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+    }
+    .report-shell[data-layout="spread"] .page.has-diagram .page-grid,
+    .report-shell[data-layout="spread"] .panel-has-diagram .panel-body {
+      grid-template-columns: minmax(0, 1.06fr) minmax(320px, 0.94fr);
+    }
+    .report-shell[data-layout="spread"] .page.has-diagram .page-visual {
+      position: sticky;
+      top: 0;
+    }
     .nav-button:hover:not([disabled]),
     .view-toggle:hover,
+    .layout-toggle:hover,
     .page-dot:hover {
       transform: translateY(-1px);
     }
+    .nav-button:hover:not([disabled]),
+    .view-toggle:hover,
+    .layout-toggle:hover {
+      border-color: rgba(140, 233, 222, 0.4);
+    }
     @media (max-width: 840px) {
+      .report-bar {
+        grid-template-columns: 1fr;
+        align-items: start;
+      }
+      .report-toolbar,
+      .toolbar-cluster {
+        justify-items: stretch;
+        align-items: flex-start;
+      }
+      .toolbar-cluster,
+      .view-toggle-group,
+      .layout-toggle-group {
+        width: 100%;
+      }
       .summary-grid,
       .page.has-diagram .page-grid,
-      .verification-grid {
+      .verification-grid,
+      .panel-has-diagram .panel-body {
         grid-template-columns: 1fr;
       }
       .page-status {
@@ -916,12 +1062,14 @@ fn html_style() -> &'static str {
       .summary-stats {
         grid-template-columns: 1fr 1fr;
       }
-      .view-toggle-group {
-        width: 100%;
-      }
-      .view-toggle {
+      .view-toggle,
+      .layout-toggle {
         flex: 1;
         text-align: center;
+      }
+      .layout-toggle-group {
+        display: grid;
+        grid-template-columns: auto 1fr 1fr;
       }
       .diagram-modal {
         padding: 10px;
@@ -946,6 +1094,7 @@ fn html_script() -> &'static str {
         overview: root.querySelector('[data-view="overview"]'),
       };
       const toggles = Array.from(root.querySelectorAll('[data-view-target]'));
+      const layoutToggles = Array.from(root.querySelectorAll('[data-layout-target]'));
       const track = root.querySelector('[data-book-track]');
       const pages = Array.from(root.querySelectorAll('[data-page]'));
       const dots = Array.from(root.querySelectorAll('[data-page-dot]'));
@@ -959,7 +1108,7 @@ fn html_script() -> &'static str {
       const modalCloseButtons = Array.from(root.querySelectorAll('[data-diagram-close]'));
       const diagramTriggers = Array.from(root.querySelectorAll('[data-diagram-trigger]'));
 
-      const state = { view: 'book', page: 0 };
+      const state = { view: 'book', page: 0, layout: root.dataset.layout || 'reader' };
       let lastTrigger = null;
 
       function setView(view) {
@@ -1001,6 +1150,16 @@ fn html_script() -> &'static str {
         }
       }
 
+      function setLayout(layout) {
+        state.layout = layout;
+        root.dataset.layout = layout;
+        layoutToggles.forEach((button) => {
+          const active = button.dataset.layoutTarget === layout;
+          button.classList.toggle('is-active', active);
+          button.setAttribute('aria-pressed', String(active));
+        });
+      }
+
       function openDiagram(trigger) {
         if (!modal || !modalBody || !modalTitle) return;
         const templateId = trigger.dataset.diagramTemplateId;
@@ -1028,6 +1187,11 @@ fn html_script() -> &'static str {
       toggles.forEach((button) => {
         button.addEventListener('click', () => setView(button.dataset.viewTarget || 'book'));
       });
+      layoutToggles.forEach((button) => {
+        button.addEventListener('click', () => {
+          setLayout(button.dataset.layoutTarget || 'reader');
+        });
+      });
       diagramTriggers.forEach((trigger) => {
         trigger.addEventListener('click', () => openDiagram(trigger));
       });
@@ -1054,6 +1218,7 @@ fn html_script() -> &'static str {
       });
 
       setView('book');
+      setLayout(state.layout);
       setPage(0);
     })();
     "#
@@ -1417,31 +1582,31 @@ fn svg_shell(
   <title id=\"{id}-title\">{title}</title>
   <style>
     .node, .panel-box {{
-      fill: rgba(255, 252, 246, 0.98);
-      stroke: rgba(15, 118, 110, 0.86);
+      fill: rgba(16, 35, 46, 0.98);
+      stroke: rgba(99, 214, 198, 0.86);
       stroke-width: 1.5;
     }}
     .lane {{
-      stroke: rgba(15, 118, 110, 0.36);
+      stroke: rgba(99, 214, 198, 0.28);
       stroke-width: 1.4;
       stroke-dasharray: 7 7;
     }}
     .connector {{
-      stroke: rgba(15, 118, 110, 0.9);
+      stroke: rgba(99, 214, 198, 0.9);
       stroke-width: 2;
       fill: none;
     }}
     .timeline-axis {{
-      stroke: rgba(15, 118, 110, 0.42);
+      stroke: rgba(99, 214, 198, 0.34);
       stroke-width: 3;
     }}
     .timeline-dot {{
-      fill: rgba(15, 118, 110, 0.92);
-      stroke: rgba(15, 118, 110, 0.2);
+      fill: rgba(99, 214, 198, 0.92);
+      stroke: rgba(99, 214, 198, 0.2);
       stroke-width: 6;
     }}
     .node-copy, .edge-copy, .event-copy, .event-label, .bullet-copy {{
-      fill: #0f172a;
+      fill: #ecf6f3;
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     }}
     .node-copy {{
@@ -1451,7 +1616,7 @@ fn svg_shell(
     .edge-copy {{
       font-size: 11px;
       font-weight: 600;
-      fill: #475569;
+      fill: #a8c4c2;
     }}
     .event-label {{
       font-size: 13px;
@@ -1459,12 +1624,12 @@ fn svg_shell(
     }}
     .event-copy, .bullet-copy {{
       font-size: 12px;
-      fill: #475569;
+      fill: #b5cbca;
     }}
   </style>
   <defs>
     <marker id=\"{marker_id}\" viewBox=\"0 0 10 10\" refX=\"8\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto-start-reverse\">
-      <path d=\"M 0 0 L 10 5 L 0 10 z\" fill=\"rgba(15, 118, 110, 0.9)\" />
+      <path d=\"M 0 0 L 10 5 L 0 10 z\" fill=\"rgba(99, 214, 198, 0.9)\" />
     </marker>
   </defs>
   {body}
@@ -1509,7 +1674,7 @@ fn write_bullet_lines(output: &mut String, x: i32, start_y: i32, lines: &[String
         let y = start_y + index as i32 * 16;
         write!(
             output,
-            "<circle cx=\"{}\" cy=\"{}\" r=\"2.6\" fill=\"rgba(15, 118, 110, 0.86)\"/>",
+            "<circle cx=\"{}\" cy=\"{}\" r=\"2.6\" fill=\"rgba(99, 214, 198, 0.86)\"/>",
             x,
             y - 4
         )
@@ -1824,8 +1989,11 @@ mod tests {
         assert!(rendered.contains("Magellan walkthrough"));
         assert!(rendered.contains("Book View"));
         assert!(rendered.contains("Overview"));
+        assert!(rendered.contains("Reader"));
+        assert!(rendered.contains("Spread"));
         assert!(rendered.contains("data-view=\"book\""));
         assert!(rendered.contains("data-view=\"overview\" hidden"));
+        assert!(rendered.contains("data-layout=\"reader\""));
         assert!(rendered.contains("data-book-track"));
         assert!(rendered.contains("Page 1 / 3"));
         assert!(rendered.contains("data-diagram-modal"));
@@ -1834,6 +2002,8 @@ mod tests {
         assert!(rendered.contains("<link rel=\"icon\" href=\"data:,\">"));
         assert!(rendered.contains("<svg viewBox="));
         assert!(rendered.contains("ASCII fallback"));
+        assert!(rendered.contains("color-scheme: dark;"));
+        assert!(!rendered.contains("color-scheme: light;"));
         assert!(!rendered.contains("cdn.jsdelivr"));
     }
 
@@ -1843,6 +2013,7 @@ mod tests {
             ExamplePreset::Walkthrough,
             ExamplePreset::Timeline,
             ExamplePreset::BeforeAfter,
+            ExamplePreset::Followup,
         ] {
             let rendered = render_document(&example_document(preset), OutputFormat::Html);
             assert!(rendered.contains("<svg viewBox="));
