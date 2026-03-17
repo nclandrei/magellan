@@ -163,12 +163,15 @@ fn render_html(document: &Document) -> String {
 <body>
   <main class=\"report-shell\" data-magellan-report data-layout=\"reader\">
     <header class=\"report-bar\">
-      <div class=\"report-bar-copy\">
+      <div class=\"report-context\">
         <p class=\"eyebrow\">Magellan walkthrough</p>
-        <h1>{title}</h1>
-        <p class=\"report-note\">Book view now defaults to a prose-first reading layout. Switch to spread when you want diagrams to stay beside the copy, or overview when you want the whole walkthrough at once.</p>
+        <p class=\"report-title\" title=\"{title}\">{title}</p>
       </div>
       <div class=\"report-toolbar\">
+        <div class=\"page-status\" aria-live=\"polite\">
+          <span class=\"page-label\" data-current-page-label>Summary</span>
+          <span class=\"page-counter\" data-page-counter>Page 1 / {total_pages}</span>
+        </div>
         <div class=\"toolbar-cluster\">
           <div class=\"view-toggle-group\" role=\"tablist\" aria-label=\"Report views\">
             <button class=\"view-toggle is-active\" type=\"button\" data-view-target=\"book\" aria-pressed=\"true\">Book View</button>
@@ -179,10 +182,6 @@ fn render_html(document: &Document) -> String {
             <button class=\"layout-toggle is-active\" type=\"button\" data-layout-target=\"reader\" aria-pressed=\"true\">Reader</button>
             <button class=\"layout-toggle\" type=\"button\" data-layout-target=\"spread\" aria-pressed=\"false\">Spread</button>
           </div>
-        </div>
-        <div class=\"page-status\" aria-live=\"polite\">
-          <span class=\"page-label\" data-current-page-label>Summary</span>
-          <span class=\"page-counter\" data-page-counter>Page 1 / {total_pages}</span>
         </div>
       </div>
     </header>
@@ -281,7 +280,7 @@ fn render_summary_page(
           </div>
           <div class=\"page-grid summary-grid\">
             <div class=\"page-copy\">
-              <h2>{title}</h2>
+              <h1 class=\"summary-title\">{title}</h1>
               {summary_html}
             </div>
             <aside class=\"summary-stats\" aria-label=\"Walkthrough summary\">
@@ -510,9 +509,8 @@ fn html_style() -> &'static str {
     .report-shell {
       max-width: 1180px;
       margin: 0 auto;
-      padding: 32px 18px 72px;
+      padding: 24px 18px 72px;
     }
-    .report-bar,
     .hero,
     .panel,
     .page {
@@ -524,32 +522,50 @@ fn html_style() -> &'static str {
       backdrop-filter: blur(10px);
     }
     .report-bar {
-      display: grid;
-      gap: 22px;
-      grid-template-columns: minmax(0, 1.18fr) minmax(280px, 0.82fr);
-      align-items: end;
-      margin-bottom: 22px;
-      padding: 28px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px 18px;
+      margin-bottom: 14px;
+      padding: 14px 18px;
+      border: 1px solid var(--accent-line);
+      border-radius: 22px;
+      background: rgba(7, 17, 24, 0.78);
+      box-shadow: var(--shadow-soft);
+      backdrop-filter: blur(16px);
     }
-    .report-bar-copy {
-      max-width: 760px;
+    .report-context {
+      min-width: 0;
+      display: grid;
+      gap: 4px;
+    }
+    .report-title {
+      margin: 0;
+      max-width: 48ch;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--ink);
+      font-size: 1rem;
+      line-height: 1.25;
+      font-weight: 600;
     }
     .report-toolbar {
       display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      justify-content: space-between;
-      gap: 18px;
-      min-height: 100%;
-    }
-    .toolbar-cluster {
-      display: grid;
+      flex-wrap: wrap;
       align-items: center;
-      justify-items: end;
-      gap: 12px;
+      justify-content: flex-end;
+      gap: 10px 14px;
       position: relative;
       z-index: 3;
-      width: 100%;
+    }
+    .toolbar-cluster {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
     }
     .eyebrow {
       text-transform: uppercase;
@@ -567,8 +583,8 @@ fn html_style() -> &'static str {
       color: var(--ink);
     }
     h1 {
-      max-width: 14ch;
-      font-size: clamp(2.35rem, 5vw, 4.1rem);
+      max-width: 11ch;
+      font-size: clamp(2.8rem, 5.4vw, 4.9rem);
       text-wrap: balance;
     }
     h2 {
@@ -581,16 +597,11 @@ fn html_style() -> &'static str {
       font-size: 1.03rem;
       line-height: 1.76;
     }
-    .report-note {
-      max-width: 56ch;
-      margin: 0;
-      color: var(--ink-soft);
-    }
     .view-toggle-group {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
-      padding: 6px;
+      gap: 6px;
+      padding: 4px;
       border-radius: 999px;
       background: rgba(6, 17, 24, 0.76);
       border: 1px solid var(--accent-line);
@@ -599,17 +610,17 @@ fn html_style() -> &'static str {
     .layout-toggle-group {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
-      padding: 6px;
+      gap: 6px;
+      padding: 4px;
       border-radius: 999px;
       background: rgba(6, 17, 24, 0.76);
       border: 1px solid var(--accent-line);
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
     }
     .toolbar-label {
-      padding: 0 4px 0 8px;
+      padding: 0 4px 0 10px;
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 0.74rem;
+      font-size: 0.72rem;
       text-transform: uppercase;
       letter-spacing: 0.08em;
       color: var(--muted);
@@ -629,22 +640,22 @@ fn html_style() -> &'static str {
         border-color 140ms ease;
     }
     .view-toggle {
-      padding: 10px 14px;
+      padding: 8px 12px;
       border-radius: 999px;
       border: 1px solid transparent;
       background: transparent;
       color: var(--muted);
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 0.88rem;
+      font-size: 0.83rem;
     }
     .layout-toggle {
-      padding: 10px 14px;
+      padding: 8px 12px;
       border-radius: 999px;
       border: 1px solid transparent;
       background: transparent;
       color: var(--muted);
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 0.84rem;
+      font-size: 0.8rem;
     }
     .view-toggle.is-active,
     .layout-toggle.is-active {
@@ -656,17 +667,20 @@ fn html_style() -> &'static str {
       flex-direction: column;
       align-items: flex-end;
       gap: 2px;
-      min-width: 132px;
+      min-width: 0;
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      padding-right: 4px;
     }
     .page-label {
-      font-size: 0.92rem;
+      max-width: 28ch;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 0.88rem;
       color: var(--ink);
       font-weight: 600;
     }
     .page-counter {
-      font-size: 0.8rem;
+      font-size: 0.74rem;
       color: var(--accent);
       text-transform: uppercase;
       letter-spacing: 0.06em;
@@ -677,9 +691,9 @@ fn html_style() -> &'static str {
     }
     .book-shell {
       display: grid;
-      gap: 16px;
-      height: calc(100vh - 304px);
-      min-height: 560px;
+      gap: 14px;
+      height: calc(100vh - 196px);
+      min-height: 640px;
       grid-template-rows: minmax(0, 1fr) auto;
     }
     .book-window {
@@ -698,7 +712,7 @@ fn html_style() -> &'static str {
     .page {
       width: 100%;
       min-width: 100%;
-      padding: 28px;
+      padding: 30px 30px 36px;
       height: 100%;
       display: flex;
       flex-direction: column;
@@ -740,6 +754,9 @@ fn html_style() -> &'static str {
     }
     .summary-grid {
       align-items: stretch;
+    }
+    .summary-title {
+      margin-bottom: 18px;
     }
     .summary-stats {
       display: grid;
@@ -1013,18 +1030,19 @@ fn html_style() -> &'static str {
     }
     @media (max-width: 840px) {
       .report-bar {
-        grid-template-columns: 1fr;
         align-items: start;
       }
       .report-toolbar,
       .toolbar-cluster {
-        justify-items: stretch;
+        justify-content: flex-start;
         align-items: flex-start;
       }
-      .toolbar-cluster,
-      .view-toggle-group,
-      .layout-toggle-group {
+      .report-toolbar {
         width: 100%;
+      }
+      .report-title {
+        max-width: none;
+        white-space: normal;
       }
       .summary-grid,
       .page.has-diagram .page-grid,
@@ -1042,15 +1060,16 @@ fn html_style() -> &'static str {
         bottom: 10px;
       }
       .report-toolbar {
-        align-items: flex-start;
+        justify-content: space-between;
       }
       .book-shell {
-        height: calc(100vh - 240px);
+        height: calc(100vh - 224px);
+        min-height: 520px;
       }
     }
     @media (max-width: 560px) {
       .report-shell {
-        padding: 20px 12px 48px;
+        padding: 16px 12px 48px;
       }
       .report-bar,
       .hero,
@@ -1066,6 +1085,15 @@ fn html_style() -> &'static str {
       .layout-toggle {
         flex: 1;
         text-align: center;
+      }
+      .report-toolbar {
+        gap: 12px;
+      }
+      .page-status {
+        width: 100%;
+      }
+      .page-label {
+        max-width: none;
       }
       .layout-toggle-group {
         display: grid;
@@ -1994,6 +2022,9 @@ mod tests {
         assert!(rendered.contains("data-view=\"book\""));
         assert!(rendered.contains("data-view=\"overview\" hidden"));
         assert!(rendered.contains("data-layout=\"reader\""));
+        assert!(rendered.contains("class=\"report-title\""));
+        assert!(rendered.contains("class=\"summary-title\""));
+        assert!(rendered.contains("data-current-page-label"));
         assert!(rendered.contains("data-book-track"));
         assert!(rendered.contains("Page 1 / 3"));
         assert!(rendered.contains("data-diagram-modal"));

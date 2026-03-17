@@ -243,7 +243,9 @@ fn session_fixture_html_includes_expected_book_paging_structure() {
         template_count, 3,
         "book view should include one modal template per section diagram"
     );
-    assert!(html.contains("Book view now defaults to a prose-first reading layout."));
+    assert!(html.contains("class=\"report-title\""));
+    assert!(html.contains("data-current-page-label"));
+    assert!(html.contains("data-page-counter"));
     assert!(html.contains("data-layout=\"reader\""));
     assert!(html.contains("Reader"));
     assert!(html.contains("Spread"));
