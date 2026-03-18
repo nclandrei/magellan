@@ -35,8 +35,7 @@ fn prompt_question_flow_works_end_to_end_with_real_binary() {
     let prompt = fs::read_to_string(&prompt_path).expect("prompt output should be readable");
 
     assert!(prompt.contains("why did this validation path change?"));
-    assert!(prompt.contains("magellan validate --input /tmp/question-flow.json"));
-    assert!(prompt.contains("magellan render --input /tmp/question-flow.json --format markdown"));
+    assert!(prompt.contains("magellan go --input /tmp/question-flow.json"));
     assert!(prompt.contains("inspect the current diff or commit range"));
     assert!(
         prompt.contains(
@@ -91,7 +90,7 @@ fn prompt_scope_flow_works_end_to_end_with_real_binary() {
 
     assert!(prompt.contains("keep the walkthrough centered on this scope: backend"));
     assert!(prompt.contains("keep the walkthrough centered on this scope: tests"));
-    assert!(prompt.contains("magellan validate --input /tmp/scope-flow.json"));
+    assert!(prompt.contains("magellan go --input /tmp/scope-flow.json"));
     assert!(prompt.contains("optimize for another engineer picking up the work quickly"));
 }
 
@@ -132,5 +131,5 @@ fn prompt_handoff_flow_recommends_timeline_and_component_graph_end_to_end() {
     assert!(prompt.contains(
         "architecture-focused explanations usually benefit from a `component_graph` section"
     ));
-    assert!(prompt.contains("magellan render --input /tmp/handoff-flow.json --format html --open"));
+    assert!(prompt.contains("magellan go --input /tmp/handoff-flow.json"));
 }

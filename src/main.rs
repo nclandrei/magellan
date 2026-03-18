@@ -100,6 +100,20 @@ Examples:
 
 Validation checks pacing and diagram structure. It does not verify factual truth.";
 
+const GO_AFTER_HELP: &str = "\
+Validate, render HTML, open it, and write markdown — all in one command.
+
+This is the expected final step after creating a JSON payload.
+Agents should always use `go` instead of separate validate + render calls.
+
+Examples:
+  magellan go --input /tmp/magellan.json
+  magellan go --input /tmp/magellan.json --markdown-out /tmp/walkthrough.md --out /tmp/walkthrough.html
+  cat payload.json | magellan go --input -
+
+When --out is omitted, the HTML file is auto-named from the title and opened.
+When --markdown-out is omitted, the markdown file is derived from --input with a .md extension.";
+
 const RENDER_AFTER_HELP: &str = "\
 Format guide:
   terminal  Fast in-chat or terminal explanation with ASCII diagrams
@@ -114,11 +128,13 @@ Diagram guide:
   before_after     User-visible behavior change
 
 Examples:
+  magellan render --input /tmp/magellan.json --format html --open --markdown-out /tmp/magellan.md
   magellan render --input examples/session-walkthrough.json --format terminal
   magellan render --input examples/branch-handoff-timeline.json --format markdown
   magellan render --input examples/followup-validation-question.json --format html --open
   cat payload.json | magellan render --input - --format html --open
 
+Use --markdown-out to also write a markdown version alongside the primary render.
 HTML reports now default to a page-by-page book layout. Use the built-in Overview switch inside the report when you want the whole walkthrough at once, and click book-mode diagrams to enlarge them.
 
 `--open` requires `--format html`.";
@@ -180,6 +196,19 @@ enum Command {
         #[arg(long, default_value = "walkthrough")]
         preset: CliExamplePreset,
     },
+    /// Validate, render HTML, open it, and write markdown — all in one step.
+    #[command(after_help = GO_AFTER_HELP)]
+    Go {
+        /// JSON file to load, or '-' to read from stdin.
+        #[arg(long)]
+        input: PathBuf,
+        /// Where to write the HTML report. Auto-named from the title when omitted.
+        #[arg(long)]
+        out: Option<PathBuf>,
+        /// Where to write the markdown version. Derived from --input with .md extension when omitted.
+        #[arg(long)]
+        markdown_out: Option<PathBuf>,
+    },
     /// Validate a JSON payload without rendering it.
     #[command(after_help = VALIDATE_AFTER_HELP)]
     Validate {
@@ -202,6 +231,9 @@ enum Command {
         /// Open the rendered HTML report after writing it.
         #[arg(long)]
         open: bool,
+        /// Also write a markdown version to this path alongside the primary render.
+        #[arg(long)]
+        markdown_out: Option<PathBuf>,
     },
 }
 
@@ -297,6 +329,7 @@ fn main() -> Result<()> {
             render_format,
             focus,
         } => {
+            let _render_format = render_format;
             let options = PromptOptions {
                 agent_type,
                 source,
@@ -305,7 +338,6 @@ fn main() -> Result<()> {
                 question: question.as_deref(),
                 scope: &scope,
                 artifact: artifact.as_path(),
-                render_format: render_format.into(),
                 focus: &focus,
             };
             println!("{}", prompt_text(options));
@@ -314,16 +346,43 @@ fn main() -> Result<()> {
             let document = example_document(preset.into());
             println!("{}", serde_json::to_string_pretty(&document)?);
         }
+        Command::Go {
+            input,
+            out,
+            markdown_out,
+        } => {
+            let document = read_document(&input)?;
+            document.validate()?;
+
+            let html_rendered = render_document(&document, OutputFormat::Html);
+            let html_path = out.unwrap_or_else(|| default_html_output_path(&document.title));
+            write_output(Some(&html_path), &html_rendered)?;
+            open_path(&html_path)?;
+            println!("Opened {}", html_path.display());
+
+            let md_path = markdown_out.unwrap_or_else(|| {
+                if input == Path::new("-") {
+                    default_html_output_path(&document.title).with_extension("md")
+                } else {
+                    input.with_extension("md")
+                }
+            });
+            let md_rendered = render_document(&document, OutputFormat::Markdown);
+            write_output(Some(&md_path), &md_rendered)?;
+            println!("Wrote {}", md_path.display());
+        }
         Command::Validate { input } => {
             let document = read_document(&input)?;
             document.validate()?;
-            println!("Payload is valid.");
+            println!("Payload is valid. Now render it:");
+            println!("  magellan go --input {}", input.display());
         }
         Command::Render {
             input,
             format,
             out,
             open,
+            markdown_out,
         } => {
             let document = read_document(&input)?;
             document.validate()?;
@@ -340,6 +399,12 @@ fn main() -> Result<()> {
                     }
                 }
                 None => write_output(None, &rendered)?,
+            }
+
+            if let Some(md_path) = markdown_out {
+                let md_rendered = render_document(&document, OutputFormat::Markdown);
+                write_output(Some(&md_path), &md_rendered)?;
+                println!("Wrote {}", md_path.display());
             }
         }
     }
@@ -369,7 +434,6 @@ struct PromptOptions<'a> {
     question: Option<&'a str>,
     scope: &'a [String],
     artifact: &'a Path,
-    render_format: OutputFormat,
     focus: &'a [CliPromptFocus],
 }
 
@@ -382,7 +446,6 @@ fn prompt_text(options: PromptOptions<'_>) -> String {
         (DEFAULT_TOPIC, Some(question)) => question,
         (topic, _) => topic,
     };
-    let render_command = format_render_command(options.artifact, options.render_format);
     let focus_guidance = prompt_focus_guidance(options.focus);
     let source_guidance = prompt_source_guidance(options.source);
     let goal_guidance = prompt_goal_guidance(options.goal);
@@ -390,6 +453,8 @@ fn prompt_text(options: PromptOptions<'_>) -> String {
     let question_guidance = prompt_question_guidance(options.question);
     let scope_guidance = prompt_scope_guidance(options.scope);
     let diagram_guidance = prompt_diagram_guidance(options.goal, options.focus);
+
+    let go_command = format!("magellan go --input {}", options.artifact.display());
 
     format!(
         "You are {agent_name}. Use Magellan to produce a compact walkthrough focused on this topic: {effective_topic}
@@ -406,8 +471,9 @@ Workflow:
    - short `text` arrays instead of long prose
    - optional `diagram` objects when they clarify the technical flow
    - optional `verification`
-5. Run `magellan validate --input {artifact}`.
-6. Run `{render_command}`.
+5. Run `{go_command}`.
+   This validates, renders HTML (opens it in the browser), and writes markdown.
+   Do not skip this step. The rendered artifacts are the deliverable, not a prose summary.
 
 Content rules:
 - Explain behavior, flow, or decisions.
@@ -416,6 +482,8 @@ Content rules:
 - Keep the walkthrough paced and scannable.
 - Each section becomes a page in HTML book view, so keep one idea per section.
 - Prefer diagrams only when they make the technical explanation easier to follow.
+- Do not describe the walkthrough in prose and then ask if the user wants a report.
+  The rendered artifacts are always the expected output.
 
 Diagram selection:
 {diagram_guidance}
@@ -432,11 +500,11 @@ Scope for this walkthrough:
 Focus for this walkthrough:
 {focus_guidance}
 
-Good final move:
-`{render_command}`",
+Required final step:
+`{go_command}`",
         effective_topic = effective_topic,
         artifact = options.artifact.display(),
-        render_command = render_command,
+        go_command = go_command,
         source_guidance = source_guidance,
         section_guidance = section_guidance,
         goal_guidance = goal_guidance,
@@ -552,29 +620,6 @@ fn write_output(path: Option<&Path>, rendered: &str) -> Result<()> {
     }
 
     Ok(())
-}
-
-fn format_render_command(path: &Path, render_format: OutputFormat) -> String {
-    match render_format {
-        OutputFormat::Html => {
-            format!(
-                "magellan render --input {} --format html --open",
-                path.display()
-            )
-        }
-        OutputFormat::Markdown => {
-            format!(
-                "magellan render --input {} --format markdown",
-                path.display()
-            )
-        }
-        OutputFormat::Terminal => {
-            format!(
-                "magellan render --input {} --format terminal",
-                path.display()
-            )
-        }
-    }
 }
 
 fn prompt_focus_guidance(focuses: &[CliPromptFocus]) -> String {

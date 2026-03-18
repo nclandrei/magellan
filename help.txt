@@ -1,11 +1,19 @@
 magellan - Render structured technical walkthroughs into terminal, markdown, or HTML output.
 
+MANDATORY: Your job is to produce rendered artifacts, not prose explanations.
+After writing JSON, you MUST run:
+  magellan go --input /tmp/magellan.json
+This single command validates, renders HTML (opens it in the browser), and
+writes a markdown file. Do not skip it. Do not summarize in chat instead.
+The rendered HTML and markdown files ARE the deliverable.
+
 Magellan is a deterministic presentation engine for AI-generated walkthroughs.
 It does not inspect a repository by itself and it does not call an LLM.
 An agent or engineer gathers evidence, writes a structured JSON payload, and
 then uses Magellan to validate and render that payload.
 
 Usage:
+  magellan go --input <payload.json|-> [--out <path>] [--markdown-out <path>]
   magellan schema
   magellan prompt --agent-type <codex|claude> [--source <session|diff|branch|pr>] [--goal <walkthrough|followup|handoff>] [options]
   magellan example --preset <walkthrough|timeline|before-after|followup>
@@ -14,6 +22,7 @@ Usage:
   magellan guide
 
 Commands:
+  go        Validate, render HTML, open it, and write markdown — all in one step.
   schema    Print the JSON Schema for Magellan's input payload.
   prompt    Print an agent-oriented prompt template for producing a Magellan walkthrough.
   example   Print a starter payload that agents can edit before rendering.
@@ -43,12 +52,8 @@ Normal workflow:
      - `summary`
      - `sections`
      - optional `verification`
-  4. Validate the payload.
-     - run: `magellan validate --input /tmp/magellan.json`
-  5. Render the final artifact.
-     - terminal: `magellan render --input /tmp/magellan.json --format terminal`
-     - markdown: `magellan render --input /tmp/magellan.json --format markdown`
-     - html: `magellan render --input /tmp/magellan.json --format html --open`
+  4. Validate and render. This step is mandatory, do not skip it.
+     - run: `magellan go --input /tmp/magellan.json`
 
 Common requests:
   Explain the last commit:
@@ -112,9 +117,12 @@ Prompt workflow:
   - `magellan prompt --agent-type claude --source branch --goal handoff --scope backend --scope tests --focus verification --focus decisions`
 
 Render targets:
-  terminal  Best for in-chat or terminal output with ASCII diagrams
-  markdown  Best for chat messages, docs, or PR comments with Mermaid blocks
-  html      Best for a paced visual walkthrough
+  Use `magellan go` to validate and produce both HTML and markdown in one step:
+    magellan go --input /tmp/magellan.json
+
+  html      Opened in the browser for a paced visual walkthrough
+  markdown  Also saved to disk for sharing, docs, or PR comments with Mermaid blocks
+  terminal  Only use when explicitly requested via `magellan render --format terminal`
 
 HTML behavior:
   HTML reports are self-contained and open in book view by default.
@@ -150,3 +158,10 @@ Fast paths:
 
   Prepare a handoff:
   - `magellan prompt --agent-type claude --source branch --goal handoff --scope backend --scope tests`
+
+  Validate and render (the mandatory final step):
+  - `magellan go --input /tmp/magellan.json`
+
+REMINDER: You MUST run `magellan go` after creating the JSON.
+The task is not complete until the HTML report is open in the browser and the
+markdown file exists on disk. A prose summary in chat is not a substitute.

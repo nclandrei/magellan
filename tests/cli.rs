@@ -149,7 +149,7 @@ fn prompt_command_prints_codex_template() {
             "Each section becomes a page in HTML book view, so keep one idea per section.",
         ))
         .stdout(predicate::str::contains(
-            "magellan render --input /tmp/magellan.json --format html --open",
+            "magellan go --input /tmp/magellan.json",
         ));
 }
 
@@ -306,10 +306,7 @@ fn prompt_command_can_customize_topic_source_goal_artifact_and_focus() {
             "optimize for another engineer picking up the work quickly, including decisions and verification",
         ))
         .stdout(predicate::str::contains(
-            "magellan validate --input /tmp/session-walkthrough.json",
-        ))
-        .stdout(predicate::str::contains(
-            "magellan render --input /tmp/session-walkthrough.json --format markdown",
+            "magellan go --input /tmp/session-walkthrough.json",
         ))
         .stdout(predicate::str::contains(
             "- prioritize what the system now does differently for the user or caller",
@@ -440,7 +437,8 @@ fn validate_command_accepts_a_valid_payload() {
         .arg(&input_path)
         .assert()
         .success()
-        .stdout("Payload is valid.\n");
+        .stdout(predicate::str::contains("Payload is valid. Now render it:"))
+        .stdout(predicate::str::contains("magellan go --input"));
 }
 
 #[test]
