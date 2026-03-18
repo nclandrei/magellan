@@ -161,7 +161,7 @@ fn render_html(document: &Document) -> String {
   <style>{style}</style>
 </head>
 <body>
-  <main class=\"report-shell\" data-magellan-report data-layout=\"reader\">
+  <main class=\"report-shell\" data-magellan-report data-layout=\"spread\">
     <header class=\"report-bar\">
       <div class=\"report-context\">
         <p class=\"eyebrow\">Magellan walkthrough</p>
@@ -176,11 +176,6 @@ fn render_html(document: &Document) -> String {
           <div class=\"view-toggle-group\" role=\"tablist\" aria-label=\"Report views\">
             <button class=\"view-toggle is-active\" type=\"button\" data-view-target=\"book\" aria-pressed=\"true\">Book View</button>
             <button class=\"view-toggle\" type=\"button\" data-view-target=\"overview\" aria-pressed=\"false\">Overview</button>
-          </div>
-          <div class=\"layout-toggle-group\" role=\"group\" aria-label=\"Report layout\">
-            <span class=\"toolbar-label\">Layout</span>
-            <button class=\"layout-toggle is-active\" type=\"button\" data-layout-target=\"reader\" aria-pressed=\"true\">Reader</button>
-            <button class=\"layout-toggle\" type=\"button\" data-layout-target=\"spread\" aria-pressed=\"false\">Spread</button>
           </div>
         </div>
       </div>
@@ -607,26 +602,7 @@ fn html_style() -> &'static str {
       border: 1px solid var(--accent-line);
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
     }
-    .layout-toggle-group {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 4px;
-      border-radius: 999px;
-      background: rgba(6, 17, 24, 0.76);
-      border: 1px solid var(--accent-line);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
-    }
-    .toolbar-label {
-      padding: 0 4px 0 10px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 0.72rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--muted);
-    }
     .view-toggle,
-    .layout-toggle,
     .nav-button,
     .page-dot {
       appearance: none;
@@ -648,17 +624,7 @@ fn html_style() -> &'static str {
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       font-size: 0.83rem;
     }
-    .layout-toggle {
-      padding: 8px 12px;
-      border-radius: 999px;
-      border: 1px solid transparent;
-      background: transparent;
-      color: var(--muted);
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 0.8rem;
-    }
-    .view-toggle.is-active,
-    .layout-toggle.is-active {
+    .view-toggle.is-active {
       background: var(--accent);
       color: #061116;
     }
@@ -1017,13 +983,11 @@ fn html_style() -> &'static str {
     }
     .nav-button:hover:not([disabled]),
     .view-toggle:hover,
-    .layout-toggle:hover,
     .page-dot:hover {
       transform: translateY(-1px);
     }
     .nav-button:hover:not([disabled]),
-    .view-toggle:hover,
-    .layout-toggle:hover {
+    .view-toggle:hover {
       border-color: rgba(140, 233, 222, 0.4);
     }
     @media (max-width: 840px) {
@@ -1081,8 +1045,7 @@ fn html_style() -> &'static str {
       .summary-stats {
         grid-template-columns: 1fr 1fr;
       }
-      .view-toggle,
-      .layout-toggle {
+      .view-toggle {
         flex: 1;
         text-align: center;
       }
@@ -1098,10 +1061,6 @@ fn html_style() -> &'static str {
       .book-shell {
         height: calc(100vh - 198px);
         min-height: 460px;
-      }
-      .layout-toggle-group {
-        display: grid;
-        grid-template-columns: auto 1fr 1fr;
       }
       .diagram-modal {
         padding: 10px;
@@ -1126,7 +1085,6 @@ fn html_script() -> &'static str {
         overview: root.querySelector('[data-view="overview"]'),
       };
       const toggles = Array.from(root.querySelectorAll('[data-view-target]'));
-      const layoutToggles = Array.from(root.querySelectorAll('[data-layout-target]'));
       const track = root.querySelector('[data-book-track]');
       const pages = Array.from(root.querySelectorAll('[data-page]'));
       const dots = Array.from(root.querySelectorAll('[data-page-dot]'));
@@ -1140,7 +1098,7 @@ fn html_script() -> &'static str {
       const modalCloseButtons = Array.from(root.querySelectorAll('[data-diagram-close]'));
       const diagramTriggers = Array.from(root.querySelectorAll('[data-diagram-trigger]'));
 
-      const state = { view: 'book', page: 0, layout: root.dataset.layout || 'reader' };
+      const state = { view: 'book', page: 0 };
       let lastTrigger = null;
 
       function setView(view) {
@@ -1182,16 +1140,6 @@ fn html_script() -> &'static str {
         }
       }
 
-      function setLayout(layout) {
-        state.layout = layout;
-        root.dataset.layout = layout;
-        layoutToggles.forEach((button) => {
-          const active = button.dataset.layoutTarget === layout;
-          button.classList.toggle('is-active', active);
-          button.setAttribute('aria-pressed', String(active));
-        });
-      }
-
       function openDiagram(trigger) {
         if (!modal || !modalBody || !modalTitle) return;
         const templateId = trigger.dataset.diagramTemplateId;
@@ -1219,11 +1167,6 @@ fn html_script() -> &'static str {
       toggles.forEach((button) => {
         button.addEventListener('click', () => setView(button.dataset.viewTarget || 'book'));
       });
-      layoutToggles.forEach((button) => {
-        button.addEventListener('click', () => {
-          setLayout(button.dataset.layoutTarget || 'reader');
-        });
-      });
       diagramTriggers.forEach((trigger) => {
         trigger.addEventListener('click', () => openDiagram(trigger));
       });
@@ -1250,7 +1193,6 @@ fn html_script() -> &'static str {
       });
 
       setView('book');
-      setLayout(state.layout);
       setPage(0);
     })();
     "#
@@ -2034,11 +1976,10 @@ mod tests {
         assert!(rendered.contains("Magellan walkthrough"));
         assert!(rendered.contains("Book View"));
         assert!(rendered.contains("Overview"));
-        assert!(rendered.contains("Reader"));
-        assert!(rendered.contains("Spread"));
+        assert!(!rendered.contains("Reader"));
         assert!(rendered.contains("data-view=\"book\""));
         assert!(rendered.contains("data-view=\"overview\" hidden"));
-        assert!(rendered.contains("data-layout=\"reader\""));
+        assert!(rendered.contains("data-layout=\"spread\""));
         assert!(rendered.contains("class=\"report-title\""));
         assert!(rendered.contains("class=\"summary-title\""));
         assert!(rendered.contains("data-current-page-label"));

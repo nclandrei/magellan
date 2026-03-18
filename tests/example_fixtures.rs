@@ -259,9 +259,8 @@ fn session_fixture_html_includes_expected_book_paging_structure() {
     assert!(html.contains("class=\"report-title\""));
     assert!(html.contains("data-current-page-label"));
     assert!(html.contains("data-page-counter"));
-    assert!(html.contains("data-layout=\"reader\""));
-    assert!(html.contains("Reader"));
-    assert!(html.contains("Spread"));
+    assert!(html.contains("data-layout=\"spread\""));
+    assert!(!html.contains("Reader"));
     assert!(book_nav_css.contains("width: 100%;"));
     assert!(!book_nav_css.contains("position: fixed;"));
     assert!(!book_nav_css.contains("position: sticky;"));
