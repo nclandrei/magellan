@@ -281,6 +281,7 @@ jobs:
     needs: [prepare-release, publish-homebrew, publish-crates]
     if: needs.prepare-release.outputs.release_needed == 'true'
     steps:
+      - uses: actions/checkout@v5
       - name: Publish the GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
