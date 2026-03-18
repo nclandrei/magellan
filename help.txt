@@ -8,7 +8,7 @@ then uses Magellan to validate and render that payload.
 Usage:
   magellan schema
   magellan prompt --agent-type <codex|claude> [--source <session|diff|branch|pr>] [--goal <walkthrough|followup|handoff>] [options]
-  magellan example --preset <walkthrough|timeline|before-after>
+  magellan example --preset <walkthrough|timeline|before-after|followup>
   magellan validate --input <payload.json|->
   magellan render --input <payload.json|-> --format <terminal|markdown|html> [--out <path>] [--open]
   magellan guide
@@ -140,6 +140,7 @@ Fast paths:
 
   Start from a built-in preset:
   - `magellan example --preset timeline`
+  - `magellan example --preset followup`
 
   Study a realistic HTML report:
   - `magellan render --input examples/session-walkthrough.json --format html --open`

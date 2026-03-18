@@ -65,7 +65,7 @@ then uses Magellan to validate and render that payload.
 Usage:
   magellan schema
   magellan prompt --agent-type <codex|claude> [--source <session|diff|branch|pr>] [--goal <walkthrough|followup|handoff>] [options]
-  magellan example --preset <walkthrough|timeline|before-after>
+  magellan example --preset <walkthrough|timeline|before-after|followup>
   magellan validate --input <payload.json|->
   magellan render --input <payload.json|-> --format <terminal|markdown|html> [--out <path>] [--open]
   magellan guide
@@ -197,6 +197,7 @@ Fast paths:
 
   Start from a built-in preset:
   - `magellan example --preset timeline`
+  - `magellan example --preset followup`
 
   Study a realistic HTML report:
   - `magellan render --input examples/session-walkthrough.json --format html --open`
@@ -214,6 +215,7 @@ Start with a built-in payload, validate it, then render it in the format you nee
 
 ```bash
 magellan example --preset walkthrough > walkthrough.json
+magellan example --preset followup > followup.json
 magellan validate --input walkthrough.json
 magellan render --input walkthrough.json --format terminal
 magellan render --input walkthrough.json --format markdown > walkthrough.md
@@ -296,6 +298,7 @@ cargo run -- prompt --agent-type codex --source session --goal walkthrough
 cargo run -- prompt --agent-type codex --source diff --goal followup --question "why did this flow change?"
 cargo run -- prompt --agent-type claude --source branch --goal handoff --scope backend --scope tests --artifact /tmp/handoff.json
 cargo run -- example --preset walkthrough
+cargo run -- example --preset followup
 cargo run -- validate --input examples/session-walkthrough.json
 cargo run -- render --input examples/branch-handoff-timeline.json --format markdown
 cargo run -- render --input examples/followup-validation-question.json --format html --out /tmp/magellan-question.html

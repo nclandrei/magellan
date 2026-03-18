@@ -83,6 +83,7 @@ Starter presets:
   walkthrough   Broad technical walkthrough with request-flow emphasis
   timeline      Ordered sequence when implementation order matters
   before_after  Behavior comparison when the change is best shown side by side
+  followup      Narrower follow-up explainer that answers one focused implementation question
 
 Checked-in realistic references:
   examples/session-walkthrough.json
@@ -216,6 +217,7 @@ enum CliExamplePreset {
     Walkthrough,
     Timeline,
     BeforeAfter,
+    Followup,
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
@@ -264,6 +266,7 @@ impl From<CliExamplePreset> for ExamplePreset {
             CliExamplePreset::Walkthrough => ExamplePreset::Walkthrough,
             CliExamplePreset::Timeline => ExamplePreset::Timeline,
             CliExamplePreset::BeforeAfter => ExamplePreset::BeforeAfter,
+            CliExamplePreset::Followup => ExamplePreset::Followup,
         }
     }
 }

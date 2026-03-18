@@ -7,6 +7,7 @@ pub enum ExamplePreset {
     Walkthrough,
     Timeline,
     BeforeAfter,
+    Followup,
 }
 
 pub fn example_document(preset: ExamplePreset) -> Document {
@@ -14,6 +15,7 @@ pub fn example_document(preset: ExamplePreset) -> Document {
         ExamplePreset::Walkthrough => walkthrough_example(),
         ExamplePreset::Timeline => timeline_example(),
         ExamplePreset::BeforeAfter => before_after_example(),
+        ExamplePreset::Followup => followup_example(),
     }
 }
 
@@ -142,6 +144,80 @@ fn before_after_example() -> Document {
     }
 }
 
+fn followup_example() -> Document {
+    Document {
+        title: "Follow-up: why the retry guard moved into the background worker".into(),
+        summary: vec![
+            "The retry guard moved from the API handler into the background worker so duplicate retry logic now lives next to the queue state it depends on.".into(),
+            "That makes the follow-up story narrower: the system still retries failed work, but the decision is now made where attempt counts and backoff data are already available.".into(),
+        ],
+        sections: vec![
+            Section {
+                title: "Why the worker owns retries now".into(),
+                text: vec![
+                    "The worker already has the attempt count, last failure detail, and backoff timing in memory when it picks up a job.".into(),
+                    "Moving the guard there avoids re-deriving retry state in the API path and keeps enqueueing lightweight.".into(),
+                ],
+                diagram: Some(Diagram::Flow {
+                    nodes: vec![
+                        "API Handler".into(),
+                        "Job Queue".into(),
+                        "Background Worker".into(),
+                        "Retry Guard".into(),
+                        "External Service".into(),
+                    ],
+                    edges: vec![
+                        Edge {
+                            from: "API Handler".into(),
+                            to: "Job Queue".into(),
+                            label: Some("enqueue job".into()),
+                        },
+                        Edge {
+                            from: "Job Queue".into(),
+                            to: "Background Worker".into(),
+                            label: Some("claim job".into()),
+                        },
+                        Edge {
+                            from: "Background Worker".into(),
+                            to: "Retry Guard".into(),
+                            label: Some("attempt metadata".into()),
+                        },
+                        Edge {
+                            from: "Retry Guard".into(),
+                            to: "External Service".into(),
+                            label: Some("retry if allowed".into()),
+                        },
+                    ],
+                }),
+            },
+            Section {
+                title: "Before and after the move".into(),
+                text: vec![
+                    "Before the change, the API handler needed enough context to guess whether a retry should happen.".into(),
+                    "After the change, the handler only enqueues work and the worker makes the retry decision with better local context.".into(),
+                ],
+                diagram: Some(Diagram::BeforeAfter(BeforeAfterDiagram {
+                    before: vec![
+                        "API handler checks retry eligibility before enqueueing".into(),
+                        "Retry state is reconstructed from partial request context".into(),
+                        "Worker executes the job after an earlier decision".into(),
+                    ],
+                    after: vec![
+                        "API handler enqueues the job immediately".into(),
+                        "Worker reads attempt count and backoff state from the queue record".into(),
+                        "Retry guard decides locally before the external call".into(),
+                    ],
+                })),
+            },
+        ],
+        verification: Some(Verification {
+            text: vec![
+                "A worker-focused test now covers max-attempt handling, and a manual replay of a failed job confirmed that retries stop at the expected boundary.".into(),
+            ],
+        }),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -152,6 +228,7 @@ mod tests {
             ExamplePreset::Walkthrough,
             ExamplePreset::Timeline,
             ExamplePreset::BeforeAfter,
+            ExamplePreset::Followup,
         ] {
             let document = example_document(preset);
             assert!(document.validate().is_ok());

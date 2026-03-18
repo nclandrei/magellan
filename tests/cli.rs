@@ -206,11 +206,30 @@ fn example_help_points_to_presets_and_realistic_references() {
         .success()
         .stdout(predicate::str::contains("Starter presets:"))
         .stdout(predicate::str::contains(
+            "followup      Narrower follow-up explainer that answers one focused implementation question",
+        ))
+        .stdout(predicate::str::contains(
             "timeline      Ordered sequence when implementation order matters",
         ))
         .stdout(predicate::str::contains(
             "examples/followup-validation-question.json",
         ));
+}
+
+#[test]
+fn example_command_prints_followup_preset() {
+    Command::cargo_bin("magellan")
+        .expect("binary should build")
+        .args(["example", "--preset", "followup"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"title\": \"Follow-up: why the retry guard moved into the background worker\"",
+        ))
+        .stdout(predicate::str::contains(
+            "\"title\": \"Why the worker owns retries now\"",
+        ))
+        .stdout(predicate::str::contains("\"verification\": {"));
 }
 
 #[test]
