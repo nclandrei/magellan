@@ -1220,6 +1220,7 @@ fn render_svg_diagram(index: usize, diagram: &Diagram) -> String {
         }
         Diagram::Timeline { events } => render_timeline_svg(&diagram_id, events),
         Diagram::BeforeAfter(before_after) => render_before_after_svg(&diagram_id, before_after),
+        Diagram::LayerStack { layers } => render_layer_stack_svg(&diagram_id, layers),
     }
 }
 
@@ -1519,6 +1520,41 @@ fn render_before_after_svg(id: &str, before_after: &BeforeAfterDiagram) -> Strin
     svg_shell(id, width, height, &marker_id, "Before and after", &body)
 }
 
+fn render_layer_stack_svg(id: &str, layers: &[String]) -> String {
+    let padding = 24;
+    let width = 520;
+    let layer_height = 48;
+    let gap = 6;
+    let layer_width = width - padding * 2;
+    let height = padding * 2
+        + layers.len() as i32 * layer_height
+        + (layers.len().saturating_sub(1)) as i32 * gap;
+    let marker_id = format!("{id}-arrow");
+    let mut body = String::new();
+
+    for (index, layer) in layers.iter().enumerate() {
+        let y = padding + index as i32 * (layer_height + gap);
+        let center_x = padding + layer_width / 2;
+        let center_y = y + layer_height / 2 + 5;
+
+        write!(
+            &mut body,
+            "<rect class=\"node\" x=\"{padding}\" y=\"{y}\" width=\"{layer_width}\" height=\"{layer_height}\" rx=\"8\" ry=\"8\"/>"
+        )
+        .unwrap();
+        write_multiline_svg_text(
+            &mut body,
+            center_x,
+            center_y,
+            &wrap_text(layer, 40),
+            "middle",
+            "node-copy",
+        );
+    }
+
+    svg_shell(id, width, height.max(120), &marker_id, "Layer stack", &body)
+}
+
 fn svg_shell(
     id: &str,
     width: i32,
@@ -1725,6 +1761,7 @@ fn diagram_title(diagram: &Diagram) -> &'static str {
         Diagram::ComponentGraph { .. } => "Component diagram",
         Diagram::Timeline { .. } => "Timeline",
         Diagram::BeforeAfter(_) => "Before / after",
+        Diagram::LayerStack { .. } => "Layer stack",
     }
 }
 
@@ -1748,6 +1785,13 @@ fn render_ascii_diagram(diagram: &Diagram) -> String {
             writeln!(&mut output, "After").unwrap();
             for entry in &before_after.after {
                 writeln!(&mut output, "  + {entry}").unwrap();
+            }
+            output.trim_end().to_owned()
+        }
+        Diagram::LayerStack { layers } => {
+            let mut output = String::from("Layer stack\n");
+            for layer in layers {
+                writeln!(&mut output, "  [{layer}]").unwrap();
             }
             output.trim_end().to_owned()
         }
@@ -1842,6 +1886,19 @@ fn render_mermaid_diagram(diagram: &Diagram) -> String {
                 .unwrap();
             }
             writeln!(&mut output, "    end").unwrap();
+            output.trim_end().to_owned()
+        }
+        Diagram::LayerStack { layers } => {
+            let mut output = String::from("block-beta\n");
+            for (index, layer) in layers.iter().enumerate() {
+                writeln!(
+                    &mut output,
+                    "    L{}[\"{}\"]",
+                    index,
+                    escape_mermaid_text(layer)
+                )
+                .unwrap();
+            }
             output.trim_end().to_owned()
         }
     }

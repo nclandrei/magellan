@@ -54,6 +54,7 @@ Diagram picking:
   component_graph  Steady-state relationships between modules or layers
   timeline         Ordered work, debugging steps, or event progression
   before_after     User-visible behavior change
+  layer_stack      Vertical stack of architectural layers or boundaries
 
 Reference outputs:
   examples/session-walkthrough.json
@@ -126,6 +127,7 @@ Diagram guide:
   component_graph  Steady-state relationships between modules or layers
   timeline         Ordered work, debugging steps, or event progression
   before_after     User-visible behavior change
+  layer_stack      Vertical stack of architectural layers or boundaries
 
 Examples:
   magellan render --input /tmp/magellan.json --format html --open --markdown-out /tmp/magellan.md
@@ -730,6 +732,9 @@ fn prompt_diagram_guidance(goal: CliPromptGoal, focuses: &[CliPromptFocus]) -> S
         ),
         String::from(
             "- use `before_after` when the main point is how behavior changed for the user or caller",
+        ),
+        String::from(
+            "- use `layer_stack` for vertical architectural layers, boundaries, or abstraction levels",
         ),
         String::from(
             "- prefer at most one diagram per section and skip diagrams when a short paragraph is clearer",

@@ -45,6 +45,9 @@ pub enum Diagram {
         events: Vec<TimelineEvent>,
     },
     BeforeAfter(BeforeAfterDiagram),
+    LayerStack {
+        layers: Vec<String>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -198,6 +201,20 @@ impl Diagram {
                     5,
                     errors,
                 );
+            }
+            Diagram::LayerStack { layers } => {
+                if layers.len() < 2 {
+                    errors.push(format!(
+                        "sections[{section_index}].diagram.layers requires at least 2 layers"
+                    ));
+                }
+                for (index, layer) in layers.iter().enumerate() {
+                    validate_non_empty(
+                        &format!("sections[{section_index}].diagram.layers[{index}]"),
+                        layer,
+                        errors,
+                    );
+                }
             }
         }
     }

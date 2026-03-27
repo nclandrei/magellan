@@ -98,6 +98,7 @@ Diagram picking:
   component_graph  Steady-state relationships between modules or layers
   timeline         Ordered work, debugging steps, or event progression
   before_after     User-visible behavior change
+  layer_stack      Vertical stack of architectural layers or boundaries
 
 Prompt workflow:
   Use `magellan prompt` when you want Magellan to teach the agent how to build
