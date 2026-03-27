@@ -465,23 +465,22 @@ fn html_style() -> &'static str {
     r#"
     :root {
       color-scheme: dark;
-      --bg-top: #071218;
-      --bg-bottom: #09161c;
-      --surface: rgba(11, 23, 31, 0.92);
-      --surface-strong: rgba(13, 27, 36, 0.98);
-      --surface-soft: rgba(16, 32, 42, 0.92);
-      --surface-elevated: rgba(17, 36, 46, 0.98);
-      --ink: #f4efe6;
-      --ink-soft: #ddd6cb;
-      --muted: #aab8bb;
-      --accent: #63d6c6;
-      --accent-strong: #8ceddf;
-      --accent-soft: rgba(99, 214, 198, 0.14);
-      --accent-line: rgba(99, 214, 198, 0.22);
-      --border: rgba(148, 191, 186, 0.18);
-      --shadow: 0 28px 72px rgba(0, 0, 0, 0.38);
-      --shadow-soft: 0 16px 42px rgba(0, 0, 0, 0.24);
-      --code-bg: #081218;
+      --bg: #111111;
+      --surface: #1a1a1a;
+      --surface-strong: #1e1e1e;
+      --surface-soft: #222222;
+      --surface-elevated: #252525;
+      --ink: #e8e8e8;
+      --ink-soft: #cccccc;
+      --muted: #999999;
+      --accent: #7eb8ff;
+      --accent-strong: #a0ccff;
+      --accent-soft: rgba(126, 184, 255, 0.1);
+      --accent-line: rgba(126, 184, 255, 0.15);
+      --border: rgba(255, 255, 255, 0.1);
+      --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+      --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.2);
+      --code-bg: #161616;
     }
     * {
       box-sizing: border-box;
@@ -491,11 +490,8 @@ fn html_style() -> &'static str {
     }
     body {
       margin: 0;
-      font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
-      background:
-        radial-gradient(circle at top left, rgba(99, 214, 198, 0.2), transparent 28%),
-        radial-gradient(circle at 84% 12%, rgba(226, 154, 84, 0.16), transparent 18%),
-        linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
       color: var(--ink);
     }
     body[data-diagram-modal-open="true"] {
@@ -509,12 +505,10 @@ fn html_style() -> &'static str {
     .hero,
     .panel,
     .page {
-      background:
-        linear-gradient(180deg, rgba(18, 34, 44, 0.98) 0%, rgba(10, 21, 29, 0.98) 100%);
+      background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 26px;
+      border-radius: 10px;
       box-shadow: var(--shadow);
-      backdrop-filter: blur(10px);
     }
     .report-bar {
       display: flex;
@@ -524,11 +518,9 @@ fn html_style() -> &'static str {
       gap: 12px 18px;
       margin-bottom: 14px;
       padding: 14px 18px;
-      border: 1px solid var(--accent-line);
-      border-radius: 22px;
-      background: rgba(7, 17, 24, 0.78);
-      box-shadow: var(--shadow-soft);
-      backdrop-filter: blur(16px);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface);
     }
     .report-context {
       min-width: 0;
@@ -578,12 +570,12 @@ fn html_style() -> &'static str {
       color: var(--ink);
     }
     h1 {
-      max-width: 11ch;
-      font-size: clamp(2.8rem, 5.4vw, 4.9rem);
+      max-width: 20ch;
+      font-size: clamp(1.8rem, 3.5vw, 2.6rem);
       text-wrap: balance;
     }
     h2 {
-      font-size: clamp(1.5rem, 3vw, 2.2rem);
+      font-size: clamp(1.3rem, 2.5vw, 1.7rem);
       text-wrap: balance;
     }
     p {
@@ -595,12 +587,11 @@ fn html_style() -> &'static str {
     .view-toggle-group {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      padding: 4px;
-      border-radius: 999px;
-      background: rgba(6, 17, 24, 0.76);
-      border: 1px solid var(--accent-line);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+      gap: 2px;
+      padding: 3px;
+      border-radius: 8px;
+      background: var(--surface-soft);
+      border: 1px solid var(--border);
     }
     .view-toggle,
     .nav-button,
@@ -608,25 +599,20 @@ fn html_style() -> &'static str {
       appearance: none;
       border: 0;
       cursor: pointer;
-      transition:
-        transform 140ms ease,
-        background-color 140ms ease,
-        color 140ms ease,
-        opacity 140ms ease,
-        border-color 140ms ease;
+      transition: background-color 120ms ease, color 120ms ease, opacity 120ms ease;
     }
     .view-toggle {
-      padding: 8px 12px;
-      border-radius: 999px;
+      padding: 6px 12px;
+      border-radius: 6px;
       border: 1px solid transparent;
       background: transparent;
       color: var(--muted);
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 0.83rem;
+      font-size: 0.82rem;
     }
     .view-toggle.is-active {
       background: var(--accent);
-      color: #061116;
+      color: #111111;
     }
     .page-status {
       display: flex;
@@ -664,7 +650,7 @@ fn html_style() -> &'static str {
     }
     .book-window {
       overflow: hidden;
-      border-radius: 28px;
+      border-radius: 10px;
       position: relative;
       z-index: 1;
       min-height: 0;
@@ -722,10 +708,10 @@ fn html_style() -> &'static str {
       align-items: stretch;
     }
     .summary-title {
-      max-width: 12ch;
+      max-width: 28ch;
       margin-bottom: 16px;
-      font-size: clamp(2.35rem, 4.8vw, 4.2rem);
-      line-height: 0.94;
+      font-size: clamp(1.8rem, 3.5vw, 2.6rem);
+      line-height: 1.1;
     }
     .summary-stats {
       display: grid;
@@ -733,15 +719,13 @@ fn html_style() -> &'static str {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
     .stat-card {
-      background:
-        linear-gradient(180deg, rgba(20, 40, 53, 0.98) 0%, rgba(13, 27, 36, 0.98) 100%);
-      border: 1px solid var(--accent-line);
-      border-radius: 20px;
-      padding: 16px;
+      background: var(--surface-soft);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
       display: grid;
-      gap: 8px;
+      gap: 6px;
       align-content: start;
-      box-shadow: var(--shadow-soft);
     }
     .stat-label {
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -759,15 +743,15 @@ fn html_style() -> &'static str {
       align-items: start;
     }
     .verification-badge {
-      width: 92px;
-      height: 92px;
+      width: 80px;
+      height: 80px;
       border-radius: 999px;
-      background: radial-gradient(circle at 30% 30%, rgba(99, 214, 198, 0.24), rgba(99, 214, 198, 0.08));
+      background: var(--accent-soft);
       border: 1px solid var(--accent-line);
       display: grid;
       place-items: center;
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 0.84rem;
+      font-size: 0.82rem;
       text-transform: uppercase;
       letter-spacing: 0.08em;
       color: var(--accent);
@@ -777,22 +761,20 @@ fn html_style() -> &'static str {
       align-items: center;
       justify-content: space-between;
       gap: 12px;
-      padding: 12px 16px;
+      padding: 10px 16px;
       width: 100%;
-      border-radius: 999px;
-      background: rgba(8, 18, 24, 0.86);
-      border: 1px solid var(--accent-line);
-      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.32);
-      backdrop-filter: blur(12px);
+      border-radius: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
     }
     .nav-button {
-      padding: 12px 18px;
-      border-radius: 999px;
-      background: rgba(16, 34, 44, 0.9);
+      padding: 8px 16px;
+      border-radius: 6px;
+      background: var(--surface-soft);
       color: var(--ink);
-      border: 1px solid var(--accent-line);
+      border: 1px solid var(--border);
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 0.86rem;
+      font-size: 0.84rem;
     }
     .nav-button[disabled] {
       opacity: 0.48;
@@ -807,15 +789,15 @@ fn html_style() -> &'static str {
       gap: 10px;
     }
     .page-dot {
-      width: 12px;
-      height: 12px;
+      width: 8px;
+      height: 8px;
       border-radius: 999px;
-      background: rgba(99, 214, 198, 0.18);
-      border: 1px solid rgba(99, 214, 198, 0.24);
+      background: rgba(255, 255, 255, 0.15);
+      border: none;
       padding: 0;
     }
     .page-dot.is-active {
-      width: 34px;
+      width: 24px;
       background: var(--accent);
     }
     .hero,
@@ -846,10 +828,10 @@ fn html_style() -> &'static str {
     }
     .diagram {
       margin-top: 0;
-      border-radius: 20px;
-      border: 1px solid var(--accent-line);
-      background: linear-gradient(180deg, rgba(10, 23, 31, 0.98) 0%, rgba(7, 17, 24, 0.98) 100%);
-      padding: 18px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface-soft);
+      padding: 16px;
     }
     .diagram-expandable .diagram-hitbox {
       display: block;
@@ -903,8 +885,7 @@ fn html_style() -> &'static str {
       inset: 0;
       border: 0;
       padding: 0;
-      background: rgba(3, 9, 13, 0.72);
-      backdrop-filter: blur(6px);
+      background: rgba(0, 0, 0, 0.6);
       cursor: pointer;
     }
     .diagram-modal-card {
@@ -913,10 +894,10 @@ fn html_style() -> &'static str {
       width: min(1240px, calc(100vw - 24px));
       max-height: calc(100vh - 24px);
       overflow: auto;
-      border-radius: 28px;
-      border: 1px solid var(--accent-line);
+      border-radius: 10px;
+      border: 1px solid var(--border);
       background: var(--surface-strong);
-      box-shadow: 0 28px 70px rgba(0, 0, 0, 0.4);
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
       padding: 24px;
     }
     .diagram-modal-header {
@@ -932,9 +913,9 @@ fn html_style() -> &'static str {
       margin-top: 18px;
     }
     .diagram-modal-figure {
-      border-radius: 20px;
-      border: 1px solid var(--accent-line);
-      background: linear-gradient(180deg, rgba(10, 23, 31, 0.98) 0%, rgba(7, 17, 24, 0.98) 100%);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface-soft);
       padding: 18px;
     }
     .diagram-modal-figure svg {
@@ -960,14 +941,14 @@ fn html_style() -> &'static str {
     }
     pre {
       margin: 18px 0 0;
-      padding: 18px;
-      border-radius: 16px;
-      border: 1px solid var(--accent-line);
+      padding: 16px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
       background: var(--code-bg);
       overflow-x: auto;
-      color: #d8e6e4;
-      font-size: 0.95rem;
-      line-height: 1.4;
+      color: #d0d0d0;
+      font-size: 0.9rem;
+      line-height: 1.5;
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     }
     .report-shell[data-layout="spread"] .summary-grid {
@@ -982,13 +963,8 @@ fn html_style() -> &'static str {
       top: 0;
     }
     .nav-button:hover:not([disabled]),
-    .view-toggle:hover,
-    .page-dot:hover {
-      transform: translateY(-1px);
-    }
-    .nav-button:hover:not([disabled]),
     .view-toggle:hover {
-      border-color: rgba(140, 233, 222, 0.4);
+      background: var(--surface-elevated);
     }
     @media (max-width: 840px) {
       .report-bar {
@@ -1035,12 +1011,12 @@ fn html_style() -> &'static str {
       .hero,
       .panel,
       .page {
-        border-radius: 20px;
-        padding: 20px;
+        border-radius: 8px;
+        padding: 16px;
       }
       .summary-title {
         max-width: none;
-        font-size: clamp(2.15rem, 10vw, 3.35rem);
+        font-size: clamp(1.6rem, 7vw, 2.2rem);
       }
       .summary-stats {
         grid-template-columns: 1fr 1fr;
@@ -1556,31 +1532,31 @@ fn svg_shell(
   <title id=\"{id}-title\">{title}</title>
   <style>
     .node, .panel-box {{
-      fill: rgba(16, 35, 46, 0.98);
-      stroke: rgba(99, 214, 198, 0.86);
-      stroke-width: 1.5;
+      fill: #1e1e1e;
+      stroke: rgba(126, 184, 255, 0.4);
+      stroke-width: 1;
     }}
     .lane {{
-      stroke: rgba(99, 214, 198, 0.28);
-      stroke-width: 1.4;
-      stroke-dasharray: 7 7;
+      stroke: rgba(255, 255, 255, 0.12);
+      stroke-width: 1;
+      stroke-dasharray: 5 5;
     }}
     .connector {{
-      stroke: rgba(99, 214, 198, 0.9);
-      stroke-width: 2;
+      stroke: rgba(126, 184, 255, 0.6);
+      stroke-width: 1.5;
       fill: none;
     }}
     .timeline-axis {{
-      stroke: rgba(99, 214, 198, 0.34);
-      stroke-width: 3;
+      stroke: rgba(255, 255, 255, 0.15);
+      stroke-width: 2;
     }}
     .timeline-dot {{
-      fill: rgba(99, 214, 198, 0.92);
-      stroke: rgba(99, 214, 198, 0.2);
-      stroke-width: 6;
+      fill: rgba(126, 184, 255, 0.8);
+      stroke: rgba(126, 184, 255, 0.15);
+      stroke-width: 4;
     }}
     .node-copy, .edge-copy, .event-copy, .event-label, .bullet-copy {{
-      fill: #ecf6f3;
+      fill: #e0e0e0;
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     }}
     .node-copy {{
@@ -1589,8 +1565,8 @@ fn svg_shell(
     }}
     .edge-copy {{
       font-size: 11px;
-      font-weight: 600;
-      fill: #a8c4c2;
+      font-weight: 500;
+      fill: #999999;
     }}
     .event-label {{
       font-size: 13px;
@@ -1598,12 +1574,12 @@ fn svg_shell(
     }}
     .event-copy, .bullet-copy {{
       font-size: 12px;
-      fill: #b5cbca;
+      fill: #aaaaaa;
     }}
   </style>
   <defs>
     <marker id=\"{marker_id}\" viewBox=\"0 0 10 10\" refX=\"8\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto-start-reverse\">
-      <path d=\"M 0 0 L 10 5 L 0 10 z\" fill=\"rgba(99, 214, 198, 0.9)\" />
+      <path d=\"M 0 0 L 10 5 L 0 10 z\" fill=\"rgba(126, 184, 255, 0.6)\" />
     </marker>
   </defs>
   {body}
