@@ -1225,6 +1225,7 @@ fn render_svg_diagram(index: usize, diagram: &Diagram) -> String {
             states,
             transitions,
         } => render_graph_svg(&diagram_id, "State machine", states, transitions),
+        Diagram::Table { headers, rows } => render_table_svg(&diagram_id, headers, rows),
     }
 }
 
@@ -1559,6 +1560,97 @@ fn render_layer_stack_svg(id: &str, layers: &[String]) -> String {
     svg_shell(id, width, height.max(120), &marker_id, "Layer stack", &body)
 }
 
+fn render_table_svg(id: &str, headers: &[String], rows: &[Vec<String>]) -> String {
+    let padding = 24;
+    let row_height = 36;
+    let header_height = 40;
+    let col_count = headers.len() as i32;
+    let col_width = 160;
+    let width = padding * 2 + col_count * col_width;
+    let total_rows = rows.len() as i32;
+    let height = padding * 2 + header_height + total_rows * row_height + 2;
+    let marker_id = format!("{id}-arrow");
+    let mut body = String::new();
+
+    // Table outline
+    let table_width = col_count * col_width;
+    let table_height = header_height + total_rows * row_height;
+    write!(
+        &mut body,
+        "<rect class=\"panel-box\" x=\"{padding}\" y=\"{padding}\" width=\"{table_width}\" height=\"{table_height}\" rx=\"6\" ry=\"6\"/>"
+    )
+    .unwrap();
+
+    // Header separator line
+    let sep_y = padding + header_height;
+    write!(
+        &mut body,
+        "<line class=\"connector\" x1=\"{padding}\" y1=\"{sep_y}\" x2=\"{}\" y2=\"{sep_y}\" style=\"stroke-width:1\"/>",
+        padding + table_width
+    )
+    .unwrap();
+
+    // Column separator lines
+    for col in 1..col_count {
+        let x = padding + col * col_width;
+        write!(
+            &mut body,
+            "<line class=\"lane\" x1=\"{x}\" y1=\"{padding}\" x2=\"{x}\" y2=\"{}\"/>",
+            padding + table_height
+        )
+        .unwrap();
+    }
+
+    // Header text
+    for (col, header) in headers.iter().enumerate() {
+        let x = padding + col as i32 * col_width + col_width / 2;
+        let y = padding + header_height / 2 + 5;
+        write_multiline_svg_text(
+            &mut body,
+            x,
+            y,
+            std::slice::from_ref(header),
+            "middle",
+            "event-label",
+        );
+    }
+
+    // Data rows
+    for (row_index, row) in rows.iter().enumerate() {
+        let row_y = padding + header_height + row_index as i32 * row_height;
+        // Row separator (skip first)
+        if row_index > 0 {
+            write!(
+                &mut body,
+                "<line class=\"lane\" x1=\"{padding}\" y1=\"{row_y}\" x2=\"{}\" y2=\"{row_y}\"/>",
+                padding + table_width
+            )
+            .unwrap();
+        }
+        for (col, cell) in row.iter().enumerate() {
+            let x = padding + col as i32 * col_width + col_width / 2;
+            let y = row_y + row_height / 2 + 5;
+            write_multiline_svg_text(
+                &mut body,
+                x,
+                y,
+                std::slice::from_ref(cell),
+                "middle",
+                "event-copy",
+            );
+        }
+    }
+
+    svg_shell(
+        id,
+        width.max(320),
+        height.max(120),
+        &marker_id,
+        "Table",
+        &body,
+    )
+}
+
 fn svg_shell(
     id: &str,
     width: i32,
@@ -1767,6 +1859,7 @@ fn diagram_title(diagram: &Diagram) -> &'static str {
         Diagram::BeforeAfter(_) => "Before / after",
         Diagram::LayerStack { .. } => "Layer stack",
         Diagram::StateMachine { .. } => "State machine",
+        Diagram::Table { .. } => "Table",
     }
 }
 
@@ -1802,6 +1895,48 @@ fn render_ascii_diagram(diagram: &Diagram) -> String {
         }
         Diagram::StateMachine { transitions, .. } => {
             render_ascii_edges("State machine", transitions)
+        }
+        Diagram::Table { headers, rows } => {
+            let cols = headers.len();
+            let widths: Vec<usize> = (0..cols)
+                .map(|col| {
+                    let header_len = headers[col].len();
+                    let max_row = rows
+                        .iter()
+                        .map(|row| row.get(col).map_or(0, |cell| cell.len()))
+                        .max()
+                        .unwrap_or(0);
+                    header_len.max(max_row).max(3)
+                })
+                .collect();
+            let mut output = String::new();
+            // Header row
+            for (col, header) in headers.iter().enumerate() {
+                if col > 0 {
+                    output.push_str(" | ");
+                }
+                write!(&mut output, "{:<width$}", header, width = widths[col]).unwrap();
+            }
+            output.push('\n');
+            // Separator
+            for (col, width) in widths.iter().enumerate() {
+                if col > 0 {
+                    output.push_str("-+-");
+                }
+                output.push_str(&"-".repeat(*width));
+            }
+            output.push('\n');
+            // Data rows
+            for row in rows {
+                for (col, cell) in row.iter().enumerate() {
+                    if col > 0 {
+                        output.push_str(" | ");
+                    }
+                    write!(&mut output, "{:<width$}", cell, width = widths[col]).unwrap();
+                }
+                output.push('\n');
+            }
+            output.trim_end().to_owned()
         }
     }
 }
@@ -1922,6 +2057,24 @@ fn render_mermaid_diagram(diagram: &Diagram) -> String {
                 )
                 .unwrap();
             }
+            output.trim_end().to_owned()
+        }
+        Diagram::Table { headers, rows } => {
+            // Mermaid has no native table; render as a fenced markdown table inside a flowchart note
+            let mut output = String::from("flowchart LR\n");
+            let mut table = format!("| {} |\\n", headers.join(" | "));
+            table.push_str(&format!(
+                "| {} |\\n",
+                headers
+                    .iter()
+                    .map(|_| "---")
+                    .collect::<Vec<_>>()
+                    .join(" | ")
+            ));
+            for row in rows {
+                table.push_str(&format!("| {} |\\n", row.join(" | ")));
+            }
+            writeln!(&mut output, "    T[\"{}\"]", table).unwrap();
             output.trim_end().to_owned()
         }
     }

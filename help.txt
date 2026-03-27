@@ -100,6 +100,7 @@ Diagram picking:
   before_after     User-visible behavior change
   layer_stack      Vertical stack of architectural layers or boundaries
   state_machine    States connected by labeled transitions
+  table            Rows and columns for comparisons or field mappings
 
 Prompt workflow:
   Use `magellan prompt` when you want Magellan to teach the agent how to build

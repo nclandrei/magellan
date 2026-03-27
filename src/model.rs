@@ -52,6 +52,10 @@ pub enum Diagram {
         states: Vec<String>,
         transitions: Vec<Edge>,
     },
+    Table {
+        headers: Vec<String>,
+        rows: Vec<Vec<String>>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -218,6 +222,34 @@ impl Diagram {
                         layer,
                         errors,
                     );
+                }
+            }
+            Diagram::Table { headers, rows } => {
+                if headers.len() < 2 {
+                    errors.push(format!(
+                        "sections[{section_index}].diagram.headers requires at least 2 columns"
+                    ));
+                }
+                for (index, header) in headers.iter().enumerate() {
+                    validate_non_empty(
+                        &format!("sections[{section_index}].diagram.headers[{index}]"),
+                        header,
+                        errors,
+                    );
+                }
+                if rows.is_empty() {
+                    errors.push(format!(
+                        "sections[{section_index}].diagram.rows requires at least 1 row"
+                    ));
+                }
+                for (row_index, row) in rows.iter().enumerate() {
+                    if row.len() != headers.len() {
+                        errors.push(format!(
+                            "sections[{section_index}].diagram.rows[{row_index}] has {} cells but headers has {}",
+                            row.len(),
+                            headers.len()
+                        ));
+                    }
                 }
             }
             Diagram::StateMachine {

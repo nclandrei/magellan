@@ -56,6 +56,7 @@ Diagram picking:
   before_after     User-visible behavior change
   layer_stack      Vertical stack of architectural layers or boundaries
   state_machine    States connected by labeled transitions
+  table            Rows and columns for comparisons or field mappings
 
 Reference outputs:
   examples/session-walkthrough.json
@@ -130,6 +131,7 @@ Diagram guide:
   before_after     User-visible behavior change
   layer_stack      Vertical stack of architectural layers or boundaries
   state_machine    States connected by labeled transitions
+  table            Rows and columns for comparisons or field mappings
 
 Examples:
   magellan render --input /tmp/magellan.json --format html --open --markdown-out /tmp/magellan.md
@@ -740,6 +742,9 @@ fn prompt_diagram_guidance(goal: CliPromptGoal, focuses: &[CliPromptFocus]) -> S
         ),
         String::from(
             "- use `state_machine` for lifecycle or status flows with named transitions between states",
+        ),
+        String::from(
+            "- use `table` for comparisons, field mappings, permission matrices, or any structured rows-and-columns data",
         ),
         String::from(
             "- prefer at most one diagram per section and skip diagrams when a short paragraph is clearer",
