@@ -56,6 +56,17 @@ pub enum Diagram {
         headers: Vec<String>,
         rows: Vec<Vec<String>>,
     },
+    DependencyTree {
+        root: String,
+        children: Vec<TreeNode>,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct TreeNode {
+    pub label: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub children: Vec<TreeNode>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -252,6 +263,25 @@ impl Diagram {
                     }
                 }
             }
+            Diagram::DependencyTree { root, children } => {
+                validate_non_empty(
+                    &format!("sections[{section_index}].diagram.root"),
+                    root,
+                    errors,
+                );
+                if children.is_empty() {
+                    errors.push(format!(
+                        "sections[{section_index}].diagram.children requires at least 1 child"
+                    ));
+                }
+                for (index, child) in children.iter().enumerate() {
+                    validate_tree_node(
+                        &format!("sections[{section_index}].diagram.children[{index}]"),
+                        child,
+                        errors,
+                    );
+                }
+            }
             Diagram::StateMachine {
                 states,
                 transitions,
@@ -325,6 +355,13 @@ fn validate_paragraphs(
 
     for (index, paragraph) in paragraphs.iter().enumerate() {
         validate_non_empty(&format!("{field_name}[{index}]"), paragraph, errors);
+    }
+}
+
+fn validate_tree_node(path: &str, node: &TreeNode, errors: &mut Vec<String>) {
+    validate_non_empty(&format!("{path}.label"), &node.label, errors);
+    for (index, child) in node.children.iter().enumerate() {
+        validate_tree_node(&format!("{path}.children[{index}]"), child, errors);
     }
 }
 

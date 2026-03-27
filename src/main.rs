@@ -57,6 +57,7 @@ Diagram picking:
   layer_stack      Vertical stack of architectural layers or boundaries
   state_machine    States connected by labeled transitions
   table            Rows and columns for comparisons or field mappings
+  dependency_tree  Hierarchical parent-child relationships
 
 Reference outputs:
   examples/session-walkthrough.json
@@ -132,6 +133,7 @@ Diagram guide:
   layer_stack      Vertical stack of architectural layers or boundaries
   state_machine    States connected by labeled transitions
   table            Rows and columns for comparisons or field mappings
+  dependency_tree  Hierarchical parent-child relationships
 
 Examples:
   magellan render --input /tmp/magellan.json --format html --open --markdown-out /tmp/magellan.md
@@ -745,6 +747,9 @@ fn prompt_diagram_guidance(goal: CliPromptGoal, focuses: &[CliPromptFocus]) -> S
         ),
         String::from(
             "- use `table` for comparisons, field mappings, permission matrices, or any structured rows-and-columns data",
+        ),
+        String::from(
+            "- use `dependency_tree` for module dependencies, call trees, or hierarchical relationships",
         ),
         String::from(
             "- prefer at most one diagram per section and skip diagrams when a short paragraph is clearer",

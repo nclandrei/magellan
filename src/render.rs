@@ -4,7 +4,7 @@ use std::fmt::Write;
 use anyhow::{Context, Result};
 use schemars::schema_for;
 
-use crate::model::{BeforeAfterDiagram, Diagram, Document, Edge, Section, TimelineEvent};
+use crate::model::{BeforeAfterDiagram, Diagram, Document, Edge, Section, TimelineEvent, TreeNode};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OutputFormat {
@@ -1226,6 +1226,9 @@ fn render_svg_diagram(index: usize, diagram: &Diagram) -> String {
             transitions,
         } => render_graph_svg(&diagram_id, "State machine", states, transitions),
         Diagram::Table { headers, rows } => render_table_svg(&diagram_id, headers, rows),
+        Diagram::DependencyTree { root, children } => {
+            render_dependency_tree_svg(&diagram_id, root, children)
+        }
     }
 }
 
@@ -1560,6 +1563,78 @@ fn render_layer_stack_svg(id: &str, layers: &[String]) -> String {
     svg_shell(id, width, height.max(120), &marker_id, "Layer stack", &body)
 }
 
+fn render_dependency_tree_svg(id: &str, root: &str, children: &[TreeNode]) -> String {
+    let padding = 24;
+    let row_height = 32;
+    let indent_width = 28;
+    let marker_id = format!("{id}-arrow");
+
+    // Flatten tree into positioned rows
+    struct FlatRow {
+        label: String,
+        depth: i32,
+    }
+    fn flatten(node_children: &[TreeNode], depth: i32, rows: &mut Vec<FlatRow>) {
+        for child in node_children {
+            rows.push(FlatRow {
+                label: child.label.clone(),
+                depth,
+            });
+            flatten(&child.children, depth + 1, rows);
+        }
+    }
+    let mut rows = vec![FlatRow {
+        label: root.to_string(),
+        depth: 0,
+    }];
+    flatten(children, 1, &mut rows);
+
+    let max_depth = rows.iter().map(|r| r.depth).max().unwrap_or(0);
+    let width = padding * 2 + max_depth * indent_width + 300;
+    let height = padding * 2 + rows.len() as i32 * row_height;
+    let mut body = String::new();
+
+    for (index, row) in rows.iter().enumerate() {
+        let x = padding + row.depth * indent_width;
+        let y = padding + index as i32 * row_height;
+
+        // Draw a small dot for non-root nodes
+        if row.depth > 0 {
+            write!(
+                &mut body,
+                "<circle class=\"timeline-dot\" cx=\"{}\" cy=\"{}\" r=\"4\" style=\"stroke-width:2\"/>",
+                x + 4,
+                y + 12
+            )
+            .unwrap();
+        }
+
+        let text_x = if row.depth > 0 { x + 16 } else { x };
+        let class = if row.depth == 0 {
+            "event-label"
+        } else {
+            "event-copy"
+        };
+        write_multiline_svg_text(
+            &mut body,
+            text_x,
+            y + 16,
+            &wrap_text(&row.label, 30),
+            "start",
+            class,
+        );
+    }
+
+    svg_shell(
+        id,
+        width.max(320),
+        height.max(120),
+        &marker_id,
+        "Dependency tree",
+        &body,
+    )
+}
+
 fn render_table_svg(id: &str, headers: &[String], rows: &[Vec<String>]) -> String {
     let padding = 24;
     let row_height = 36;
@@ -1860,6 +1935,7 @@ fn diagram_title(diagram: &Diagram) -> &'static str {
         Diagram::LayerStack { .. } => "Layer stack",
         Diagram::StateMachine { .. } => "State machine",
         Diagram::Table { .. } => "Table",
+        Diagram::DependencyTree { .. } => "Dependency tree",
     }
 }
 
@@ -1937,6 +2013,27 @@ fn render_ascii_diagram(diagram: &Diagram) -> String {
                 output.push('\n');
             }
             output.trim_end().to_owned()
+        }
+        Diagram::DependencyTree { root, children } => {
+            let mut output = format!("{root}\n");
+            render_ascii_tree_children(&mut output, children, "");
+            output.trim_end().to_owned()
+        }
+    }
+}
+
+fn render_ascii_tree_children(output: &mut String, children: &[TreeNode], prefix: &str) {
+    for (index, child) in children.iter().enumerate() {
+        let is_last = index == children.len() - 1;
+        let connector = if is_last { "└── " } else { "├── " };
+        writeln!(output, "{prefix}{connector}{}", child.label).unwrap();
+        if !child.children.is_empty() {
+            let child_prefix = if is_last {
+                format!("{prefix}    ")
+            } else {
+                format!("{prefix}│   ")
+            };
+            render_ascii_tree_children(output, &child.children, &child_prefix);
         }
     }
 }
@@ -2057,6 +2154,39 @@ fn render_mermaid_diagram(diagram: &Diagram) -> String {
                 )
                 .unwrap();
             }
+            output.trim_end().to_owned()
+        }
+        Diagram::DependencyTree { root, children } => {
+            let mut output = String::from("flowchart TD\n");
+            fn emit_mermaid_tree(
+                output: &mut String,
+                parent: &str,
+                children: &[TreeNode],
+                counter: &mut usize,
+            ) {
+                for child in children {
+                    let child_id = format!("N{}", *counter);
+                    *counter += 1;
+                    writeln!(
+                        output,
+                        "    {} --> {}[\"{}\"]",
+                        parent,
+                        child_id,
+                        escape_mermaid_text(&child.label)
+                    )
+                    .unwrap();
+                    emit_mermaid_tree(output, &child_id, &child.children, counter);
+                }
+            }
+            let root_id = "ROOT";
+            writeln!(
+                &mut output,
+                "    {root_id}[\"{}\"]",
+                escape_mermaid_text(root)
+            )
+            .unwrap();
+            let mut counter = 0;
+            emit_mermaid_tree(&mut output, root_id, children, &mut counter);
             output.trim_end().to_owned()
         }
         Diagram::Table { headers, rows } => {

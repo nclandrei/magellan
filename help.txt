@@ -101,6 +101,7 @@ Diagram picking:
   layer_stack      Vertical stack of architectural layers or boundaries
   state_machine    States connected by labeled transitions
   table            Rows and columns for comparisons or field mappings
+  dependency_tree  Hierarchical parent-child relationships
 
 Prompt workflow:
   Use `magellan prompt` when you want Magellan to teach the agent how to build
