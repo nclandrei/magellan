@@ -55,6 +55,7 @@ Diagram picking:
   timeline         Ordered work, debugging steps, or event progression
   before_after     User-visible behavior change
   layer_stack      Vertical stack of architectural layers or boundaries
+  state_machine    States connected by labeled transitions
 
 Reference outputs:
   examples/session-walkthrough.json
@@ -128,6 +129,7 @@ Diagram guide:
   timeline         Ordered work, debugging steps, or event progression
   before_after     User-visible behavior change
   layer_stack      Vertical stack of architectural layers or boundaries
+  state_machine    States connected by labeled transitions
 
 Examples:
   magellan render --input /tmp/magellan.json --format html --open --markdown-out /tmp/magellan.md
@@ -735,6 +737,9 @@ fn prompt_diagram_guidance(goal: CliPromptGoal, focuses: &[CliPromptFocus]) -> S
         ),
         String::from(
             "- use `layer_stack` for vertical architectural layers, boundaries, or abstraction levels",
+        ),
+        String::from(
+            "- use `state_machine` for lifecycle or status flows with named transitions between states",
         ),
         String::from(
             "- prefer at most one diagram per section and skip diagrams when a short paragraph is clearer",

@@ -1221,6 +1221,10 @@ fn render_svg_diagram(index: usize, diagram: &Diagram) -> String {
         Diagram::Timeline { events } => render_timeline_svg(&diagram_id, events),
         Diagram::BeforeAfter(before_after) => render_before_after_svg(&diagram_id, before_after),
         Diagram::LayerStack { layers } => render_layer_stack_svg(&diagram_id, layers),
+        Diagram::StateMachine {
+            states,
+            transitions,
+        } => render_graph_svg(&diagram_id, "State machine", states, transitions),
     }
 }
 
@@ -1762,6 +1766,7 @@ fn diagram_title(diagram: &Diagram) -> &'static str {
         Diagram::Timeline { .. } => "Timeline",
         Diagram::BeforeAfter(_) => "Before / after",
         Diagram::LayerStack { .. } => "Layer stack",
+        Diagram::StateMachine { .. } => "State machine",
     }
 }
 
@@ -1794,6 +1799,9 @@ fn render_ascii_diagram(diagram: &Diagram) -> String {
                 writeln!(&mut output, "  [{layer}]").unwrap();
             }
             output.trim_end().to_owned()
+        }
+        Diagram::StateMachine { transitions, .. } => {
+            render_ascii_edges("State machine", transitions)
         }
     }
 }
@@ -1896,6 +1904,21 @@ fn render_mermaid_diagram(diagram: &Diagram) -> String {
                     "    L{}[\"{}\"]",
                     index,
                     escape_mermaid_text(layer)
+                )
+                .unwrap();
+            }
+            output.trim_end().to_owned()
+        }
+        Diagram::StateMachine { transitions, .. } => {
+            let mut output = String::from("stateDiagram-v2\n");
+            for edge in transitions {
+                let label = edge.label.as_deref().unwrap_or("");
+                writeln!(
+                    &mut output,
+                    "    {} --> {}: {}",
+                    sanitize_node(&edge.from),
+                    sanitize_node(&edge.to),
+                    label
                 )
                 .unwrap();
             }

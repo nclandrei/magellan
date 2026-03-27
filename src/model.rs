@@ -48,6 +48,10 @@ pub enum Diagram {
     LayerStack {
         layers: Vec<String>,
     },
+    StateMachine {
+        states: Vec<String>,
+        transitions: Vec<Edge>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -214,6 +218,31 @@ impl Diagram {
                         layer,
                         errors,
                     );
+                }
+            }
+            Diagram::StateMachine {
+                states,
+                transitions,
+            } => {
+                if states.len() < 2 {
+                    errors.push(format!(
+                        "sections[{section_index}].diagram requires at least 2 states"
+                    ));
+                }
+                for (index, state) in states.iter().enumerate() {
+                    validate_non_empty(
+                        &format!("sections[{section_index}].diagram.states[{index}]"),
+                        state,
+                        errors,
+                    );
+                }
+                if transitions.is_empty() {
+                    errors.push(format!(
+                        "sections[{section_index}].diagram requires at least 1 transition"
+                    ));
+                }
+                for (index, edge) in transitions.iter().enumerate() {
+                    edge.validate(section_index, index, errors);
                 }
             }
         }

@@ -99,6 +99,7 @@ Diagram picking:
   timeline         Ordered work, debugging steps, or event progression
   before_after     User-visible behavior change
   layer_stack      Vertical stack of architectural layers or boundaries
+  state_machine    States connected by labeled transitions
 
 Prompt workflow:
   Use `magellan prompt` when you want Magellan to teach the agent how to build
