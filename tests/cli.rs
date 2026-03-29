@@ -82,7 +82,7 @@ fn help_mentions_prompt_workflow() {
             "~/.claude/projects/<workspace-slug>/<session-id>.jsonl",
         ))
         .stdout(predicate::str::contains(
-            "In HTML, each section becomes a page in book view.",
+            "In HTML, each section becomes a scrollable block with a sidebar table of contents.",
         ))
         .stdout(predicate::str::contains(
             "examples/session-walkthrough.json",
@@ -118,7 +118,7 @@ fn guide_command_prints_checked_in_agent_playbook() {
         .stdout(predicate::str::contains("Normal workflow"))
         .stdout(predicate::str::contains("Common requests"))
         .stdout(predicate::str::contains("Diagram picking"))
-        .stdout(predicate::str::contains("Book view:"))
+        .stdout(predicate::str::contains("Sidebar:"))
         .stdout(predicate::str::contains(
             "magellan prompt --agent-type codex",
         ));
@@ -146,7 +146,7 @@ fn prompt_command_prints_codex_template() {
             "produce a broad technical walkthrough that covers the full change without drifting into fluff",
         ))
         .stdout(predicate::str::contains(
-            "Each section becomes a page in HTML book view, so keep one idea per section.",
+            "Each section becomes a scrollable block in the HTML sidebar layout, so keep one idea per section.",
         ))
         .stdout(predicate::str::contains(
             "magellan go --input /tmp/magellan.json",
@@ -263,10 +263,7 @@ fn render_help_explains_formats_and_diagram_types() {
             "magellan render --input examples/followup-validation-question.json --format html --open",
         ))
         .stdout(predicate::str::contains(
-            "HTML reports now default to a page-by-page book layout.",
-        ))
-        .stdout(predicate::str::contains(
-            "click book-mode diagrams to enlarge them",
+            "HTML reports use a sidebar scroll layout with a table of contents and dark/light theme toggle.",
         ))
         .stdout(predicate::str::contains("`--open` requires `--format html`."));
 }
@@ -474,12 +471,11 @@ fn render_command_can_write_html_to_a_file() {
     assert!(rendered.contains("<!DOCTYPE html>"));
     assert!(rendered.contains("Order validation moved earlier"));
     assert!(rendered.contains("<svg viewBox="));
-    assert!(rendered.contains("Book View"));
-    assert!(rendered.contains("Overview"));
-    assert!(rendered.contains("data-book-track"));
-    assert!(rendered.contains("data-diagram-modal"));
-    assert!(rendered.contains("data-diagram-trigger"));
-    assert!(rendered.contains("Click to enlarge"));
+    assert!(rendered.contains("class=\"sidebar\""));
+    assert!(rendered.contains("class=\"toc-link"));
+    assert!(rendered.contains("id=\"section-1\""));
+    assert!(rendered.contains("data-theme-toggle"));
+    assert!(rendered.contains("ASCII fallback"));
     assert!(!rendered.contains("cdn.jsdelivr"));
 }
 

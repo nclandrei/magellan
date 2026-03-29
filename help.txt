@@ -87,8 +87,8 @@ Content rules:
   - Keep the summary to 1-2 short paragraphs.
   - Keep sections to 3-6 focused chunks.
   - Keep section text short.
-  - In HTML, each section becomes a page in book view.
-  - In book view, diagrams can be clicked to enlarge.
+  - In HTML, each section becomes a scrollable block with a sidebar table of contents.
+  - Diagrams render inline with SVG and an ASCII fallback.
   - Use diagrams only when they make the technical explanation easier to follow.
   - Ground the content in real evidence from code, diffs, tests, and persisted session history.
 
@@ -124,21 +124,21 @@ Render targets:
   Use `magellan go` to validate and produce both HTML and markdown in one step:
     magellan go --input /tmp/magellan.json
 
-  html      Opened in the browser for a paced visual walkthrough
+  html      Opened in the browser with a sidebar TOC and continuous scroll
   markdown  Also saved to disk for sharing, docs, or PR comments with Mermaid blocks
   terminal  Only use when explicitly requested via `magellan render --format terminal`
 
 HTML behavior:
-  HTML reports are self-contained and open in book view by default.
+  HTML reports are self-contained with a sidebar scroll layout.
 
-  Book view:
-  - starts with the summary
-  - shows one technical slice per page
-  - supports page navigation
-  - lets the user click diagrams to enlarge them
+  Sidebar:
+  - sticky table of contents with links to each section
+  - dark/light theme toggle (preference stored in localStorage)
+  - collapses to a hamburger menu on narrow screens
 
-  Overview view:
-  - shows the full walkthrough as one stacked report
+  Content:
+  - continuous scroll with summary, sections, and verification
+  - diagrams render inline with SVG and an ASCII fallback
 
 Reference files:
   Use these checked-in payloads when you want realistic examples:

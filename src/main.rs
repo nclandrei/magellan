@@ -122,7 +122,7 @@ const RENDER_AFTER_HELP: &str = "\
 Format guide:
   terminal  Fast in-chat or terminal explanation with ASCII diagrams
   markdown  Good for chat messages, docs, or PR comments with Mermaid blocks
-  html      Best for paced visual walkthroughs; opens in book view with an overview toggle and clickable expandable diagrams
+  html      Best for paced visual walkthroughs; opens with a sidebar TOC, continuous scroll, and dark/light theme toggle
 
 Diagram guide:
   sequence         Request or actor-by-actor interaction flow
@@ -143,7 +143,7 @@ Examples:
   cat payload.json | magellan render --input - --format html --open
 
 Use --markdown-out to also write a markdown version alongside the primary render.
-HTML reports now default to a page-by-page book layout. Use the built-in Overview switch inside the report when you want the whole walkthrough at once, and click book-mode diagrams to enlarge them.
+HTML reports use a sidebar scroll layout with a table of contents and dark/light theme toggle.
 
 `--open` requires `--format html`.";
 
@@ -488,7 +488,7 @@ Content rules:
 - Do not narrate file churn.
 - Do not invent details that are not grounded in evidence.
 - Keep the walkthrough paced and scannable.
-- Each section becomes a page in HTML book view, so keep one idea per section.
+- Each section becomes a scrollable block in the HTML sidebar layout, so keep one idea per section.
 - Prefer diagrams only when they make the technical explanation easier to follow.
 - Do not describe the walkthrough in prose and then ask if the user wants a report.
   The rendered artifacts are always the expected output.

@@ -116,39 +116,24 @@ fn render_markdown(document: &Document) -> String {
 
 fn render_html(document: &Document) -> String {
     let summary_html = paragraphs_to_html(&document.summary);
-    let diagram_count = document
-        .sections
-        .iter()
-        .filter(|section| section.diagram.is_some())
-        .count();
-    let total_pages = 1 + document.sections.len() + usize::from(document.verification.is_some());
-    let book_pages_html = render_book_pages(document, total_pages, diagram_count);
-    let page_dots_html = render_page_dots(document);
+    let toc_html = render_toc(document);
     let sections_html = document
         .sections
         .iter()
         .enumerate()
-        .map(|(index, section)| render_overview_section_html(index, section))
+        .map(|(index, section)| render_section_html(index, section))
         .collect::<Vec<_>>()
         .join("\n");
     let verification_html = document
         .verification
         .as_ref()
-        .map(|verification| {
-            format!(
-                "<section class=\"panel\">
-                  <div class=\"panel-head\">
-                    <p class=\"eyebrow\">Verification</p>
-                    <h2>Verification</h2>
-                  </div>
-                  <div class=\"panel-body\">
-                    <div class=\"panel-copy\">{}</div>
-                  </div>
-                </section>",
-                paragraphs_to_html(&verification.text)
-            )
-        })
+        .map(render_verification_html)
         .unwrap_or_default();
+    let verification_toc = if document.verification.is_some() {
+        "\n    <a class=\"toc-link\" href=\"#verification\">Verification</a>"
+    } else {
+        ""
+    };
 
     format!(
         "<!DOCTYPE html>
@@ -161,326 +146,143 @@ fn render_html(document: &Document) -> String {
   <style>{style}</style>
 </head>
 <body>
-  <main class=\"report-shell\" data-magellan-report data-layout=\"spread\">
-    <header class=\"report-bar\">
-      <div class=\"report-context\">
-        <p class=\"eyebrow\">Magellan walkthrough</p>
-        <p class=\"report-title\" title=\"{title}\">{title}</p>
-      </div>
-      <div class=\"report-toolbar\">
-        <div class=\"page-status\" aria-live=\"polite\">
-          <span class=\"page-label\" data-current-page-label>Summary</span>
-          <span class=\"page-counter\" data-page-counter>Page 1 / {total_pages}</span>
-        </div>
-        <div class=\"toolbar-cluster\">
-          <div class=\"view-toggle-group\" role=\"tablist\" aria-label=\"Report views\">
-            <button class=\"view-toggle is-active\" type=\"button\" data-view-target=\"book\" aria-pressed=\"true\">Book View</button>
-            <button class=\"view-toggle\" type=\"button\" data-view-target=\"overview\" aria-pressed=\"false\">Overview</button>
-          </div>
-        </div>
-      </div>
+  <nav class=\"sidebar\" data-sidebar>
+    <div class=\"sidebar-header\">
+      <p class=\"eyebrow\">Contents</p>
+      <button class=\"theme-toggle\" type=\"button\" data-theme-toggle aria-label=\"Toggle light/dark mode\">Toggle theme</button>
+    </div>
+    <a class=\"toc-link is-active\" href=\"#summary\">Summary</a>
+{toc_html}{verification_toc}
+    <button class=\"sidebar-close\" type=\"button\" data-sidebar-close aria-label=\"Close sidebar\">Close</button>
+  </nav>
+  <button class=\"hamburger\" type=\"button\" data-sidebar-open aria-label=\"Open sidebar\">Menu</button>
+  <main class=\"content\">
+    <header class=\"hero\" id=\"summary\">
+      <p class=\"eyebrow\">Magellan walkthrough</p>
+      <h1>{title}</h1>
+      {summary_html}
+      <p class=\"section-count\">{section_count} sections</p>
     </header>
-
-    <section class=\"book-view is-active\" data-view=\"book\">
-      <div class=\"book-shell\">
-        <div class=\"book-window\">
-          <div class=\"book-track\" data-book-track>
-            {book_pages_html}
-          </div>
-        </div>
-        <div class=\"book-nav\">
-          <button class=\"nav-button\" type=\"button\" data-prev-page>Previous</button>
-          <div class=\"page-dots\" aria-label=\"Walkthrough pages\">
-            {page_dots_html}
-          </div>
-          <button class=\"nav-button\" type=\"button\" data-next-page>Next</button>
-        </div>
-      </div>
-    </section>
-
-    <section class=\"overview-view\" data-view=\"overview\" hidden>
-      <section class=\"hero\">
-        <p class=\"eyebrow\">Unified view</p>
-        <h2>{title}</h2>
-        {summary_html}
-      </section>
-      <div class=\"stack\">
-        {sections_html}
-        {verification_html}
-      </div>
-    </section>
-
-    {diagram_modal_html}
+{sections_html}
+{verification_html}
   </main>
+  <div class=\"lightbox\" data-lightbox hidden>
+    <button class=\"lightbox-close\" type=\"button\" data-lightbox-close aria-label=\"Close enlarged diagram\">&times;</button>
+    <div class=\"lightbox-body\" data-lightbox-body></div>
+  </div>
   <script>{script}</script>
 </body>
 </html>",
         title = escape_html(&document.title),
-        total_pages = total_pages,
         summary_html = summary_html,
+        toc_html = toc_html,
+        verification_toc = verification_toc,
+        section_count = document.sections.len(),
         sections_html = sections_html,
         verification_html = verification_html,
-        book_pages_html = book_pages_html,
-        page_dots_html = page_dots_html,
-        diagram_modal_html = render_diagram_modal_shell(),
         style = html_style(),
         script = html_script()
     )
 }
 
-fn render_book_pages(document: &Document, total_pages: usize, diagram_count: usize) -> String {
-    let mut pages = vec![render_summary_page(
-        &document.title,
-        &document.summary,
-        total_pages,
-        document.sections.len(),
-        diagram_count,
-        document.verification.is_some(),
-    )];
-
-    pages.extend(
-        document
-            .sections
-            .iter()
-            .enumerate()
-            .map(|(index, section)| render_section_page(index, total_pages, section)),
-    );
-
-    if let Some(verification) = &document.verification {
-        pages.push(render_verification_page(
-            total_pages - 1,
-            total_pages,
-            verification,
-        ));
-    }
-
-    pages.join("\n")
+fn render_toc(document: &Document) -> String {
+    document
+        .sections
+        .iter()
+        .enumerate()
+        .map(|(index, section)| {
+            format!(
+                "    <a class=\"toc-link\" href=\"#section-{}\">{}</a>",
+                index + 1,
+                escape_html(&section.title)
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
-fn render_summary_page(
-    title: &str,
-    summary: &[String],
-    total_pages: usize,
-    section_count: usize,
-    diagram_count: usize,
-    has_verification: bool,
-) -> String {
-    let verification_label = if has_verification { "Included" } else { "None" };
-
-    format!(
-        "<article class=\"page page-summary is-current\" data-page data-page-title=\"Summary\">
-          <div class=\"page-head\">
-            <p class=\"eyebrow\">Overview page</p>
-            <p class=\"page-step\">Page 1 / {total_pages}</p>
-          </div>
-          <div class=\"page-grid summary-grid\">
-            <div class=\"page-copy\">
-              <h1 class=\"summary-title\">{title}</h1>
-              {summary_html}
-            </div>
-            <aside class=\"summary-stats\" aria-label=\"Walkthrough summary\">
-              <div class=\"stat-card\">
-                <span class=\"stat-label\">Pages</span>
-                <strong>{total_pages}</strong>
-              </div>
-              <div class=\"stat-card\">
-                <span class=\"stat-label\">Sections</span>
-                <strong>{section_count}</strong>
-              </div>
-              <div class=\"stat-card\">
-                <span class=\"stat-label\">Diagrams</span>
-                <strong>{diagram_count}</strong>
-              </div>
-              <div class=\"stat-card\">
-                <span class=\"stat-label\">Verification</span>
-                <strong>{verification_label}</strong>
-              </div>
-            </aside>
-          </div>
-        </article>",
-        title = escape_html(title),
-        summary_html = paragraphs_to_html(summary),
-        total_pages = total_pages,
-        section_count = section_count,
-        diagram_count = diagram_count,
-        verification_label = verification_label
-    )
-}
-
-fn render_section_page(index: usize, total_pages: usize, section: &Section) -> String {
-    let page_number = index + 2;
+fn render_section_html(index: usize, section: &Section) -> String {
     let diagram_html = section
         .diagram
         .as_ref()
-        .map(|diagram| {
-            format!(
-                "<div class=\"page-visual\">{}</div>",
-                render_diagram_html(index, diagram, true)
-            )
-        })
+        .map(|diagram| render_diagram_html(index, diagram))
         .unwrap_or_default();
-    let page_class = if section.diagram.is_some() {
-        "page has-diagram"
-    } else {
-        "page"
-    };
 
     format!(
-        "<article class=\"{page_class}\" data-page data-page-title=\"{title}\">
-          <div class=\"page-head\">
-            <p class=\"eyebrow\">Step {step}</p>
-            <p class=\"page-step\">Page {page_number} / {total_pages}</p>
-          </div>
-          <div class=\"page-grid\">
-            <div class=\"page-copy\">
-              <h2>{title}</h2>
-              {text_html}
-            </div>
-            {diagram_html}
-          </div>
-        </article>",
-        page_class = page_class,
-        step = index + 1,
-        page_number = page_number,
-        total_pages = total_pages,
+        "    <section class=\"section\" id=\"section-{number}\">
+      <div class=\"section-head\">
+        <p class=\"eyebrow\">Step {number}</p>
+        <h2>{title}</h2>
+      </div>
+      <div class=\"section-body\">
+        {text_html}
+        {diagram_html}
+      </div>
+    </section>",
+        number = index + 1,
         title = escape_html(&section.title),
         text_html = paragraphs_to_html(&section.text),
         diagram_html = diagram_html
     )
 }
 
-fn render_verification_page(
-    page_index: usize,
-    total_pages: usize,
-    verification: &crate::model::Verification,
-) -> String {
+fn render_verification_html(verification: &crate::model::Verification) -> String {
     format!(
-        "<article class=\"page page-verification\" data-page data-page-title=\"Verification\">
-          <div class=\"page-head\">
-            <p class=\"eyebrow\">Verification</p>
-            <p class=\"page-step\">Page {page_number} / {total_pages}</p>
-          </div>
-          <div class=\"page-grid verification-grid\">
-            <div class=\"verification-badge\" aria-hidden=\"true\">Verified</div>
-            <div class=\"page-copy\">
-              <h2>Verification</h2>
-              {text_html}
-            </div>
-          </div>
-        </article>",
-        page_number = page_index + 1,
-        total_pages = total_pages,
+        "    <section class=\"section verification\" id=\"verification\">
+      <div class=\"section-head\">
+        <p class=\"eyebrow\">Verification</p>
+        <h2>Verification</h2>
+      </div>
+      <div class=\"section-body\">
+        {text_html}
+      </div>
+    </section>",
         text_html = paragraphs_to_html(&verification.text)
     )
-}
-
-fn render_page_dots(document: &Document) -> String {
-    let mut dots = vec![render_page_dot(0, "Summary", true)];
-
-    dots.extend(
-        document
-            .sections
-            .iter()
-            .enumerate()
-            .map(|(index, section)| render_page_dot(index + 1, &section.title, false)),
-    );
-
-    if document.verification.is_some() {
-        dots.push(render_page_dot(
-            document.sections.len() + 1,
-            "Verification",
-            false,
-        ));
-    }
-
-    dots.join("\n")
-}
-
-fn render_page_dot(index: usize, label: &str, is_active: bool) -> String {
-    let active_class = if is_active { " is-active" } else { "" };
-    let current = if is_active { "true" } else { "false" };
-
-    format!(
-        "<button class=\"page-dot{active_class}\" type=\"button\" data-page-dot=\"{index}\" aria-label=\"Go to {label}\" aria-current=\"{current}\"></button>",
-        active_class = active_class,
-        index = index,
-        label = escape_html(label),
-        current = current
-    )
-}
-
-fn render_overview_section_html(index: usize, section: &Section) -> String {
-    let diagram_html = section
-        .diagram
-        .as_ref()
-        .map(|diagram| {
-            format!(
-                "<div class=\"panel-visual\">{}</div>",
-                render_diagram_html(index, diagram, false)
-            )
-        })
-        .unwrap_or_default();
-    let panel_class = if section.diagram.is_some() {
-        "panel panel-has-diagram"
-    } else {
-        "panel"
-    };
-
-    format!(
-        "<section class=\"{panel_class}\">
-          <div class=\"panel-head\">
-            <p class=\"eyebrow\">Step {step}</p>
-            <h2>{title}</h2>
-          </div>
-          <div class=\"panel-body\">
-            <div class=\"panel-copy\">{text_html}</div>
-            {diagram_html}
-          </div>
-        </section>",
-        panel_class = panel_class,
-        step = index + 1,
-        title = escape_html(&section.title),
-        text_html = paragraphs_to_html(&section.text),
-        diagram_html = diagram_html
-    )
-}
-
-fn render_diagram_modal_shell() -> &'static str {
-    r#"<div class="diagram-modal" data-diagram-modal hidden>
-      <button class="diagram-modal-backdrop" type="button" data-diagram-close aria-label="Close expanded diagram"></button>
-      <div class="diagram-modal-card" role="dialog" aria-modal="true" aria-labelledby="diagram-modal-title">
-        <div class="diagram-modal-header">
-          <div>
-            <p class="eyebrow">Expanded diagram</p>
-            <h2 class="diagram-modal-title" id="diagram-modal-title" data-diagram-modal-title>Diagram</h2>
-          </div>
-          <button class="nav-button diagram-modal-close" type="button" data-diagram-close>Close</button>
-        </div>
-        <div class="diagram-modal-body" data-diagram-modal-body></div>
-      </div>
-    </div>"#
 }
 
 fn html_style() -> &'static str {
     r#"
     :root {
       color-scheme: dark;
-      --bg: #111111;
-      --surface: #1a1a1a;
-      --surface-strong: #1e1e1e;
-      --surface-soft: #222222;
-      --surface-elevated: #252525;
-      --ink: #e8e8e8;
-      --ink-soft: #cccccc;
-      --muted: #999999;
-      --accent: #7eb8ff;
-      --accent-strong: #a0ccff;
-      --accent-soft: rgba(126, 184, 255, 0.1);
-      --accent-line: rgba(126, 184, 255, 0.15);
-      --border: rgba(255, 255, 255, 0.1);
+      --bg: #131211;
+      --surface: #1b1a18;
+      --ink: #d9d5d0;
+      --ink-soft: #b5b0a9;
+      --muted: #8a847d;
+      --accent: #a09890;
+      --accent-strong: #c0b8b0;
+      --border: rgba(255, 255, 255, 0.08);
       --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-      --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.2);
-      --code-bg: #161616;
+      --code-bg: #161514;
+      --diagram-node-fill: #1b1a18;
+      --diagram-stroke: rgba(160, 152, 144, 0.4);
+      --diagram-lane: rgba(255, 255, 255, 0.12);
+      --diagram-dot: rgba(160, 152, 144, 0.8);
+      --diagram-dot-ring: rgba(160, 152, 144, 0.15);
+      --diagram-text: #d9d5d0;
+      --diagram-text-muted: #a09890;
+      --sidebar-width: 240px;
+    }
+    [data-theme="light"] {
+      color-scheme: light;
+      --bg: #f5f3f0;
+      --surface: #ffffff;
+      --ink: #2a2725;
+      --ink-soft: #4a4541;
+      --muted: #7a736c;
+      --accent: #7a736c;
+      --accent-strong: #5a534c;
+      --border: rgba(0, 0, 0, 0.1);
+      --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+      --code-bg: #edebe8;
+      --diagram-node-fill: #ffffff;
+      --diagram-stroke: rgba(90, 83, 76, 0.4);
+      --diagram-lane: rgba(0, 0, 0, 0.1);
+      --diagram-dot: rgba(90, 83, 76, 0.8);
+      --diagram-dot-ring: rgba(90, 83, 76, 0.15);
+      --diagram-text: #2a2725;
+      --diagram-text-muted: #7a736c;
     }
     * {
       box-sizing: border-box;
@@ -493,66 +295,115 @@ fn html_style() -> &'static str {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       background: var(--bg);
       color: var(--ink);
-    }
-    body[data-diagram-modal-open="true"] {
-      overflow: hidden;
-    }
-    .report-shell {
-      max-width: 1180px;
-      margin: 0 auto;
-      padding: 24px 18px 72px;
-    }
-    .hero,
-    .panel,
-    .page {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      box-shadow: var(--shadow);
-    }
-    .report-bar {
       display: flex;
-      flex-wrap: wrap;
+      min-height: 100vh;
+    }
+    .sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: var(--sidebar-width);
+      height: 100vh;
+      overflow-y: auto;
+      padding: 24px 16px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      z-index: 10;
+    }
+    .sidebar-header {
+      display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px 18px;
-      margin-bottom: 14px;
-      padding: 14px 18px;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      background: var(--surface);
+      margin-bottom: 12px;
     }
-    .report-context {
-      min-width: 0;
-      display: grid;
-      gap: 4px;
-    }
-    .report-title {
+    .sidebar-header .eyebrow {
       margin: 0;
-      max-width: 48ch;
+    }
+    .sidebar-close {
+      display: none;
+      appearance: none;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--muted);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 0.82rem;
+      cursor: pointer;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .theme-toggle {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--muted);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 0.78rem;
+      cursor: pointer;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      transition: background-color 120ms ease, color 120ms ease;
+    }
+    .theme-toggle:hover {
+      color: var(--ink);
+      background: var(--bg);
+    }
+    .toc-link {
+      display: block;
+      padding: 6px 10px;
+      border-radius: 6px;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.88rem;
+      line-height: 1.4;
+      transition: background-color 120ms ease, color 120ms ease;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+    .toc-link:hover {
       color: var(--ink);
-      font-size: 1rem;
-      line-height: 1.25;
+      background: var(--bg);
+    }
+    .toc-link.is-active {
+      color: var(--ink);
+      background: var(--bg);
       font-weight: 600;
     }
-    .report-toolbar {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: flex-end;
-      gap: 10px 14px;
-      position: relative;
-      z-index: 3;
+    .hamburger {
+      display: none;
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      z-index: 20;
+      appearance: none;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--ink);
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 0.88rem;
+      cursor: pointer;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      box-shadow: var(--shadow);
     }
-    .toolbar-cluster {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: flex-end;
-      gap: 10px;
+    .content {
+      margin-left: var(--sidebar-width);
+      flex: 1;
+      max-width: 820px;
+      padding: 32px 36px 72px;
+    }
+    .hero {
+      margin-bottom: 32px;
+    }
+    .section-count {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.82rem;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
     }
     .eyebrow {
       text-transform: uppercase;
@@ -565,283 +416,95 @@ fn html_style() -> &'static str {
     h1,
     h2 {
       margin: 0 0 12px;
-      line-height: 1.05;
+      line-height: 1.1;
       font-weight: 700;
       color: var(--ink);
     }
     h1 {
-      max-width: 20ch;
-      font-size: clamp(1.8rem, 3.5vw, 2.6rem);
+      font-size: clamp(1.6rem, 3vw, 2.2rem);
       text-wrap: balance;
     }
     h2 {
-      font-size: clamp(1.3rem, 2.5vw, 1.7rem);
+      font-size: clamp(1.2rem, 2vw, 1.5rem);
       text-wrap: balance;
     }
     p {
       margin: 0 0 14px;
-      color: var(--muted);
-      font-size: 1.03rem;
-      line-height: 1.76;
+      color: var(--ink-soft);
+      font-size: 1rem;
+      line-height: 1.7;
     }
-    .view-toggle-group {
-      display: inline-flex;
-      align-items: center;
-      gap: 2px;
-      padding: 3px;
-      border-radius: 8px;
-      background: var(--surface-soft);
-      border: 1px solid var(--border);
+    .section {
+      padding: 28px 0;
+      border-top: 1px solid var(--border);
     }
-    .view-toggle,
-    .nav-button,
-    .page-dot {
-      appearance: none;
-      border: 0;
-      cursor: pointer;
-      transition: background-color 120ms ease, color 120ms ease, opacity 120ms ease;
+    .section-head {
+      margin-bottom: 16px;
     }
-    .view-toggle {
-      padding: 6px 12px;
-      border-radius: 6px;
-      border: 1px solid transparent;
-      background: transparent;
-      color: var(--muted);
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 0.82rem;
-    }
-    .view-toggle.is-active {
-      background: var(--accent);
-      color: #111111;
-    }
-    .page-status {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 2px;
-      min-width: 0;
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    }
-    .page-label {
-      max-width: 28ch;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      font-size: 0.88rem;
-      color: var(--ink);
-      font-weight: 600;
-    }
-    .page-counter {
-      font-size: 0.74rem;
-      color: var(--accent);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-    }
-    .book-view[hidden],
-    .overview-view[hidden] {
-      display: none;
-    }
-    .book-shell {
-      display: grid;
-      gap: 14px;
-      height: calc(100vh - 180px);
-      min-height: 620px;
-      grid-template-rows: minmax(0, 1fr) auto;
-    }
-    .book-window {
-      overflow: hidden;
-      border-radius: 10px;
-      position: relative;
-      z-index: 1;
-      min-height: 0;
-      height: 100%;
-    }
-    .book-track {
-      display: flex;
-      width: 100%;
-      transition: transform 280ms ease;
-    }
-    .page {
-      width: 100%;
-      min-width: 100%;
-      padding: 26px 28px 28px;
-      height: 100%;
-      display: flex;
-      flex-direction: column;
-      gap: 22px;
-      overflow-y: auto;
-    }
-    .page-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      padding-bottom: 16px;
-      border-bottom: 1px solid var(--accent-line);
-    }
-    .page-step {
-      margin: 0;
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 0.82rem;
-      color: var(--accent);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      white-space: nowrap;
-    }
-    .page-grid {
-      display: grid;
-      gap: 24px;
-      align-items: start;
-      grid-template-columns: 1fr;
-    }
-    .page-copy {
-      min-width: 0;
+    .section-body {
       max-width: 64ch;
     }
-    .page-copy p:last-child {
+    .section-body p:last-child {
       margin-bottom: 0;
     }
-    .page-visual {
-      min-width: 0;
-    }
-    .summary-grid {
-      align-items: stretch;
-    }
-    .summary-title {
-      max-width: 28ch;
-      margin-bottom: 16px;
-      font-size: clamp(1.8rem, 3.5vw, 2.6rem);
-      line-height: 1.1;
-    }
-    .summary-stats {
-      display: grid;
-      gap: 14px;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-    .stat-card {
-      background: var(--surface-soft);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 14px;
-      display: grid;
-      gap: 6px;
-      align-content: start;
-    }
-    .stat-label {
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 0.78rem;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: var(--accent-strong);
-    }
-    .stat-card strong {
-      font-size: 1.35rem;
-      color: var(--ink);
-    }
-    .verification-grid {
-      grid-template-columns: 110px minmax(0, 1fr);
-      align-items: start;
-    }
-    .verification-badge {
-      width: 80px;
-      height: 80px;
-      border-radius: 999px;
-      background: var(--accent-soft);
-      border: 1px solid var(--accent-line);
-      display: grid;
-      place-items: center;
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 0.82rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--accent);
-    }
-    .book-nav {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      padding: 10px 16px;
-      width: 100%;
-      border-radius: 10px;
+    .verification {
       background: var(--surface);
       border: 1px solid var(--border);
-    }
-    .nav-button {
-      padding: 8px 16px;
-      border-radius: 6px;
-      background: var(--surface-soft);
-      color: var(--ink);
-      border: 1px solid var(--border);
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 0.84rem;
-    }
-    .nav-button[disabled] {
-      opacity: 0.48;
-      cursor: default;
-      transform: none;
-    }
-    .page-dots {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-    }
-    .page-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.15);
-      border: none;
-      padding: 0;
-    }
-    .page-dot.is-active {
-      width: 24px;
-      background: var(--accent);
-    }
-    .hero,
-    .panel {
+      border-radius: 10px;
       padding: 28px;
-    }
-    .hero {
-      margin-bottom: 20px;
-    }
-    .panel-head {
-      margin-bottom: 18px;
-    }
-    .panel-body {
-      display: grid;
-      gap: 24px;
-      align-items: start;
-      grid-template-columns: 1fr;
-    }
-    .panel-copy {
-      max-width: 68ch;
-    }
-    .panel-copy p:last-child {
-      margin-bottom: 0;
-    }
-    .stack {
-      display: grid;
-      gap: 20px;
+      margin-top: 12px;
     }
     .diagram {
-      margin-top: 0;
+      margin-top: 20px;
       border-radius: 8px;
       border: 1px solid var(--border);
-      background: var(--surface-soft);
+      background: var(--surface);
       padding: 16px;
+      cursor: zoom-in;
     }
-    .diagram-expandable .diagram-hitbox {
+    .lightbox[hidden] {
+      display: none;
+    }
+    .lightbox {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      background: rgba(0, 0, 0, 0.7);
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      cursor: zoom-out;
+    }
+    .lightbox-close {
+      position: absolute;
+      top: 16px;
+      right: 20px;
+      appearance: none;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--ink);
+      border-radius: 8px;
+      width: 40px;
+      height: 40px;
+      font-size: 1.4rem;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      z-index: 1;
+    }
+    .lightbox-body {
+      width: min(1200px, calc(100vw - 48px));
+      max-height: calc(100vh - 48px);
+      overflow: auto;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      padding: 24px;
+    }
+    .lightbox-body svg {
       display: block;
       width: 100%;
-      border: 0;
-      padding: 0;
-      background: transparent;
-      text-align: left;
-      color: inherit;
-      cursor: zoom-in;
+      height: auto;
     }
     .diagram-label {
       margin: 0 0 12px;
@@ -860,76 +523,6 @@ fn html_style() -> &'static str {
       width: 100%;
       height: auto;
     }
-    .diagram-hint {
-      display: block;
-      margin-top: 12px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 0.8rem;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: var(--accent);
-    }
-    .diagram-modal[hidden] {
-      display: none;
-    }
-    .diagram-modal {
-      position: fixed;
-      inset: 0;
-      z-index: 40;
-      display: grid;
-      place-items: center;
-      padding: 18px;
-    }
-    .diagram-modal-backdrop {
-      position: absolute;
-      inset: 0;
-      border: 0;
-      padding: 0;
-      background: rgba(0, 0, 0, 0.6);
-      cursor: pointer;
-    }
-    .diagram-modal-card {
-      position: relative;
-      z-index: 1;
-      width: min(1240px, calc(100vw - 24px));
-      max-height: calc(100vh - 24px);
-      overflow: auto;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      background: var(--surface-strong);
-      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
-      padding: 24px;
-    }
-    .diagram-modal-header {
-      display: flex;
-      align-items: start;
-      justify-content: space-between;
-      gap: 16px;
-    }
-    .diagram-modal-title {
-      margin-bottom: 0;
-    }
-    .diagram-modal-body {
-      margin-top: 18px;
-    }
-    .diagram-modal-figure {
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      background: var(--surface-soft);
-      padding: 18px;
-    }
-    .diagram-modal-figure svg {
-      display: block;
-      width: 100%;
-      height: auto;
-      max-height: calc(100vh - 220px);
-    }
-    .diagram-modal-note {
-      margin-top: 14px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 0.82rem;
-      color: var(--accent-strong);
-    }
     details {
       margin-top: 16px;
     }
@@ -946,105 +539,36 @@ fn html_style() -> &'static str {
       border: 1px solid var(--border);
       background: var(--code-bg);
       overflow-x: auto;
-      color: #d0d0d0;
+      color: var(--ink-soft);
       font-size: 0.9rem;
       line-height: 1.5;
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     }
-    .report-shell[data-layout="spread"] .summary-grid {
-      grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
-    }
-    .report-shell[data-layout="spread"] .page.has-diagram .page-grid,
-    .report-shell[data-layout="spread"] .panel-has-diagram .panel-body {
-      grid-template-columns: minmax(0, 1.06fr) minmax(320px, 0.94fr);
-    }
-    .report-shell[data-layout="spread"] .page.has-diagram .page-visual {
-      position: sticky;
-      top: 0;
-    }
-    .nav-button:hover:not([disabled]),
-    .view-toggle:hover {
-      background: var(--surface-elevated);
-    }
     @media (max-width: 840px) {
-      .report-bar {
-        align-items: start;
+      .sidebar {
+        transform: translateX(-100%);
+        transition: transform 200ms ease;
+        box-shadow: none;
       }
-      .report-toolbar,
-      .toolbar-cluster {
-        justify-content: flex-start;
-        align-items: flex-start;
+      .sidebar.is-open {
+        transform: translateX(0);
+        box-shadow: 4px 0 24px rgba(0, 0, 0, 0.3);
       }
-      .report-toolbar {
-        width: 100%;
+      .sidebar-close {
+        display: block;
+        margin-top: auto;
       }
-      .report-title {
-        max-width: none;
-        white-space: normal;
+      .hamburger {
+        display: block;
       }
-      .summary-grid,
-      .page.has-diagram .page-grid,
-      .verification-grid,
-      .panel-has-diagram .panel-body {
-        grid-template-columns: 1fr;
-      }
-      .page-status {
-        align-items: flex-start;
-      }
-      .book-nav {
-        flex-wrap: wrap;
-        justify-content: center;
-      }
-      .report-toolbar {
-        justify-content: space-between;
-      }
-      .book-shell {
-        height: calc(100vh - 208px);
-        min-height: 500px;
+      .content {
+        margin-left: 0;
+        padding: 24px 20px 48px;
       }
     }
     @media (max-width: 560px) {
-      .report-shell {
-        padding: 16px 12px 48px;
-      }
-      .report-bar,
-      .hero,
-      .panel,
-      .page {
-        border-radius: 8px;
-        padding: 16px;
-      }
-      .summary-title {
-        max-width: none;
-        font-size: clamp(1.6rem, 7vw, 2.2rem);
-      }
-      .summary-stats {
-        grid-template-columns: 1fr 1fr;
-      }
-      .view-toggle {
-        flex: 1;
-        text-align: center;
-      }
-      .report-toolbar {
-        gap: 12px;
-      }
-      .page-status {
-        width: 100%;
-      }
-      .page-label {
-        max-width: none;
-      }
-      .book-shell {
-        height: calc(100vh - 198px);
-        min-height: 460px;
-      }
-      .diagram-modal {
-        padding: 10px;
-      }
-      .diagram-modal-card {
-        width: calc(100vw - 20px);
-        max-height: calc(100vh - 20px);
-        padding: 18px;
+      .content {
+        padding: 20px 14px 40px;
       }
     }
     "#
@@ -1053,160 +577,101 @@ fn html_style() -> &'static str {
 fn html_script() -> &'static str {
     r#"
     (() => {
-      const root = document.querySelector('[data-magellan-report]');
-      if (!root) return;
+      const sidebar = document.querySelector('[data-sidebar]');
+      const openBtn = document.querySelector('[data-sidebar-open]');
+      const closeBtn = document.querySelector('[data-sidebar-close]');
+      const themeBtn = document.querySelector('[data-theme-toggle]');
+      const tocLinks = Array.from(document.querySelectorAll('.toc-link'));
+      const sections = Array.from(document.querySelectorAll('.hero, .section'));
 
-      const views = {
-        book: root.querySelector('[data-view="book"]'),
-        overview: root.querySelector('[data-view="overview"]'),
-      };
-      const toggles = Array.from(root.querySelectorAll('[data-view-target]'));
-      const track = root.querySelector('[data-book-track]');
-      const pages = Array.from(root.querySelectorAll('[data-page]'));
-      const dots = Array.from(root.querySelectorAll('[data-page-dot]'));
-      const prev = root.querySelector('[data-prev-page]');
-      const next = root.querySelector('[data-next-page]');
-      const pageLabel = root.querySelector('[data-current-page-label]');
-      const pageCounter = root.querySelector('[data-page-counter]');
-      const modal = root.querySelector('[data-diagram-modal]');
-      const modalBody = root.querySelector('[data-diagram-modal-body]');
-      const modalTitle = root.querySelector('[data-diagram-modal-title]');
-      const modalCloseButtons = Array.from(root.querySelectorAll('[data-diagram-close]'));
-      const diagramTriggers = Array.from(root.querySelectorAll('[data-diagram-trigger]'));
+      const stored = localStorage.getItem('magellan-theme');
+      if (stored === 'light') document.documentElement.setAttribute('data-theme', 'light');
 
-      const state = { view: 'book', page: 0 };
-      let lastTrigger = null;
-
-      function setView(view) {
-        state.view = view;
-        Object.entries(views).forEach(([name, element]) => {
-          if (!element) return;
-          const active = name === view;
-          element.hidden = !active;
-          element.classList.toggle('is-active', active);
-        });
-        toggles.forEach((button) => {
-          const active = button.dataset.viewTarget === view;
-          button.classList.toggle('is-active', active);
-          button.setAttribute('aria-pressed', String(active));
-        });
-      }
-
-      function setPage(page) {
-        const bounded = Math.max(0, Math.min(page, pages.length - 1));
-        state.page = bounded;
-        if (track) {
-          track.style.transform = `translateX(-${bounded * 100}%)`;
-        }
-        pages.forEach((pageElement, index) => {
-          pageElement.classList.toggle('is-current', index === bounded);
-        });
-        dots.forEach((dot, index) => {
-          const active = index === bounded;
-          dot.classList.toggle('is-active', active);
-          dot.setAttribute('aria-current', String(active));
-        });
-        if (prev) prev.disabled = bounded === 0;
-        if (next) next.disabled = bounded === pages.length - 1;
-        if (pageLabel && pages[bounded]) {
-          pageLabel.textContent = pages[bounded].dataset.pageTitle || `Page ${bounded + 1}`;
-        }
-        if (pageCounter) {
-          pageCounter.textContent = `Page ${bounded + 1} / ${pages.length}`;
+      function toggleTheme() {
+        const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+        if (isLight) {
+          document.documentElement.removeAttribute('data-theme');
+          localStorage.setItem('magellan-theme', 'dark');
+        } else {
+          document.documentElement.setAttribute('data-theme', 'light');
+          localStorage.setItem('magellan-theme', 'light');
         }
       }
+      if (themeBtn) themeBtn.addEventListener('click', toggleTheme);
 
-      function openDiagram(trigger) {
-        if (!modal || !modalBody || !modalTitle) return;
-        const templateId = trigger.dataset.diagramTemplateId;
-        if (!templateId) return;
-        const template = root.querySelector(`#${templateId}`);
-        if (!(template instanceof HTMLTemplateElement)) return;
+      if (openBtn) openBtn.addEventListener('click', () => sidebar && sidebar.classList.add('is-open'));
+      if (closeBtn) closeBtn.addEventListener('click', () => sidebar && sidebar.classList.remove('is-open'));
 
-        modalTitle.textContent = trigger.dataset.diagramTitle || 'Diagram';
-        modalBody.innerHTML = template.innerHTML;
-        modal.hidden = false;
-        document.body.setAttribute('data-diagram-modal-open', 'true');
-        lastTrigger = trigger;
-      }
-
-      function closeDiagram() {
-        if (!modal || modal.hidden) return;
-        modal.hidden = true;
-        if (modalBody) modalBody.innerHTML = '';
-        document.body.removeAttribute('data-diagram-modal-open');
-        if (lastTrigger instanceof HTMLElement) {
-          lastTrigger.focus();
-        }
-      }
-
-      toggles.forEach((button) => {
-        button.addEventListener('click', () => setView(button.dataset.viewTarget || 'book'));
-      });
-      diagramTriggers.forEach((trigger) => {
-        trigger.addEventListener('click', () => openDiagram(trigger));
-      });
-      modalCloseButtons.forEach((button) => {
-        button.addEventListener('click', closeDiagram);
-      });
-      dots.forEach((dot, index) => {
-        dot.addEventListener('click', () => {
-          setView('book');
-          setPage(index);
+      tocLinks.forEach(link => {
+        link.addEventListener('click', () => {
+          if (sidebar && window.innerWidth <= 840) sidebar.classList.remove('is-open');
         });
       });
-      if (prev) prev.addEventListener('click', () => setPage(state.page - 1));
-      if (next) next.addEventListener('click', () => setPage(state.page + 1));
-      window.addEventListener('keydown', (event) => {
-        if (modal && !modal.hidden && event.key === 'Escape') {
-          closeDiagram();
-          return;
-        }
-        if (modal && !modal.hidden) return;
-        if (state.view !== 'book') return;
-        if (event.key === 'ArrowRight') setPage(state.page + 1);
-        if (event.key === 'ArrowLeft') setPage(state.page - 1);
+
+      // Lightbox
+      const lightbox = document.querySelector('[data-lightbox]');
+      const lightboxBody = document.querySelector('[data-lightbox-body]');
+      const lightboxClose = document.querySelector('[data-lightbox-close]');
+      const diagrams = Array.from(document.querySelectorAll('.diagram'));
+
+      function openLightbox(diagram) {
+        if (!lightbox || !lightboxBody) return;
+        const svg = diagram.querySelector('svg');
+        if (!svg) return;
+        lightboxBody.innerHTML = svg.outerHTML;
+        lightbox.hidden = false;
+        document.body.style.overflow = 'hidden';
+      }
+      function closeLightbox() {
+        if (!lightbox) return;
+        lightbox.hidden = true;
+        if (lightboxBody) lightboxBody.innerHTML = '';
+        document.body.style.overflow = '';
+      }
+      diagrams.forEach(d => d.addEventListener('click', (e) => {
+        if (e.target.closest('details') || e.target.closest('summary')) return;
+        openLightbox(d);
+      }));
+      if (lightboxClose) lightboxClose.addEventListener('click', closeLightbox);
+      if (lightbox) lightbox.addEventListener('click', (e) => {
+        if (e.target === lightbox) closeLightbox();
+      });
+      window.addEventListener('keydown', (e) => {
+        if (lightbox && !lightbox.hidden && e.key === 'Escape') closeLightbox();
       });
 
-      setView('book');
-      setPage(0);
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const id = entry.target.id;
+            tocLinks.forEach(link => {
+              link.classList.toggle('is-active', link.getAttribute('href') === '#' + id);
+            });
+          }
+        });
+      }, { rootMargin: '-20% 0px -60% 0px' });
+
+      sections.forEach(section => {
+        if (section.id) observer.observe(section);
+      });
     })();
     "#
 }
 
-fn render_diagram_html(index: usize, diagram: &Diagram, expandable: bool) -> String {
+fn render_diagram_html(index: usize, diagram: &Diagram) -> String {
     let svg = render_svg_diagram(index, diagram);
     let ascii = escape_html(&render_ascii_diagram(diagram));
     let title = diagram_title(diagram);
 
-    if expandable {
-        let template_id = format!("diagram-template-{index}");
-        let modal_svg = render_svg_diagram(index + 10_000, diagram);
-
-        return format!(
-            "<div class=\"diagram diagram-expandable\">
-              <button class=\"diagram-hitbox\" type=\"button\" data-diagram-trigger data-diagram-template-id=\"{template_id}\" data-diagram-title=\"{title}\" aria-label=\"Expand {title}\">
-                <span class=\"diagram-label\">{title}</span>
-                <span class=\"diagram-stage\">{svg}</span>
-                <span class=\"diagram-hint\">Click to enlarge</span>
-              </button>
-              <details><summary>ASCII fallback</summary><pre>{ascii}</pre></details>
-              <template id=\"{template_id}\">
-                <div class=\"diagram-modal-figure\">{modal_svg}</div>
-                <p class=\"diagram-modal-note\">Press Escape or click outside the diagram to close.</p>
-              </template>
-            </div>",
-            template_id = template_id,
-            title = title,
-            svg = svg,
-            ascii = ascii,
-            modal_svg = modal_svg
-        );
-    }
-
     format!(
-        "<div class=\"diagram\"><p class=\"diagram-label\">{}</p>{}<details><summary>ASCII fallback</summary><pre>{}</pre></details></div>",
-        title, svg, ascii
+        "<figure class=\"diagram\">
+          <p class=\"diagram-label\">{title}</p>
+          <div class=\"diagram-stage\">{svg}</div>
+          <details><summary>ASCII fallback</summary><pre>{ascii}</pre></details>
+        </figure>",
+        title = title,
+        svg = svg,
+        ascii = ascii
     )
 }
 
@@ -1739,31 +1204,31 @@ fn svg_shell(
   <title id=\"{id}-title\">{title}</title>
   <style>
     .node, .panel-box {{
-      fill: #1e1e1e;
-      stroke: rgba(126, 184, 255, 0.4);
+      fill: var(--diagram-node-fill, #1b1a18);
+      stroke: var(--diagram-stroke, rgba(160, 152, 144, 0.4));
       stroke-width: 1;
     }}
     .lane {{
-      stroke: rgba(255, 255, 255, 0.12);
+      stroke: var(--diagram-lane, rgba(255, 255, 255, 0.12));
       stroke-width: 1;
       stroke-dasharray: 5 5;
     }}
     .connector {{
-      stroke: rgba(126, 184, 255, 0.6);
+      stroke: var(--diagram-stroke, rgba(160, 152, 144, 0.6));
       stroke-width: 1.5;
       fill: none;
     }}
     .timeline-axis {{
-      stroke: rgba(255, 255, 255, 0.15);
+      stroke: var(--diagram-lane, rgba(255, 255, 255, 0.15));
       stroke-width: 2;
     }}
     .timeline-dot {{
-      fill: rgba(126, 184, 255, 0.8);
-      stroke: rgba(126, 184, 255, 0.15);
+      fill: var(--diagram-dot, rgba(160, 152, 144, 0.8));
+      stroke: var(--diagram-dot-ring, rgba(160, 152, 144, 0.15));
       stroke-width: 4;
     }}
     .node-copy, .edge-copy, .event-copy, .event-label, .bullet-copy {{
-      fill: #e0e0e0;
+      fill: var(--diagram-text, #d9d5d0);
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     }}
     .node-copy {{
@@ -1773,7 +1238,7 @@ fn svg_shell(
     .edge-copy {{
       font-size: 11px;
       font-weight: 500;
-      fill: #999999;
+      fill: var(--diagram-text-muted, #a09890);
     }}
     .event-label {{
       font-size: 13px;
@@ -1781,12 +1246,12 @@ fn svg_shell(
     }}
     .event-copy, .bullet-copy {{
       font-size: 12px;
-      fill: #aaaaaa;
+      fill: var(--diagram-text-muted, #a09890);
     }}
   </style>
   <defs>
     <marker id=\"{marker_id}\" viewBox=\"0 0 10 10\" refX=\"8\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto-start-reverse\">
-      <path d=\"M 0 0 L 10 5 L 0 10 z\" fill=\"rgba(126, 184, 255, 0.6)\" />
+      <path d=\"M 0 0 L 10 5 L 0 10 z\" fill=\"var(--diagram-stroke, rgba(160, 152, 144, 0.6))\" />
     </marker>
   </defs>
   {body}
@@ -1831,7 +1296,7 @@ fn write_bullet_lines(output: &mut String, x: i32, start_y: i32, lines: &[String
         let y = start_y + index as i32 * 16;
         write!(
             output,
-            "<circle cx=\"{}\" cy=\"{}\" r=\"2.6\" fill=\"rgba(99, 214, 198, 0.86)\"/>",
+            "<circle cx=\"{}\" cy=\"{}\" r=\"2.6\" fill=\"var(--diagram-dot, rgba(160, 152, 144, 0.86))\"/>",
             x,
             y - 4
         )
@@ -2241,18 +1706,6 @@ mod tests {
     use crate::model::{Diagram, Document, Edge, Section, Verification};
     use crate::{ExamplePreset, example_document};
 
-    fn css_block<'a>(html: &'a str, selector: &str) -> &'a str {
-        let marker = format!("{selector} {{");
-        let start = html
-            .find(&marker)
-            .unwrap_or_else(|| panic!("missing CSS block for {selector}"));
-        let rest = &html[start..];
-        let end = rest
-            .find("\n    }")
-            .unwrap_or_else(|| panic!("unterminated CSS block for {selector}"));
-        &rest[..end]
-    }
-
     fn sample_document() -> Document {
         Document {
             title: "Magellan demo".into(),
@@ -2309,33 +1762,25 @@ mod tests {
     #[test]
     fn renders_html_panels() {
         let rendered = render_document(&sample_document(), OutputFormat::Html);
-        let book_nav_css = css_block(&rendered, ".book-nav");
 
         assert!(rendered.contains("<!DOCTYPE html>"));
         assert!(rendered.contains("Magellan walkthrough"));
-        assert!(rendered.contains("Book View"));
-        assert!(rendered.contains("Overview"));
-        assert!(!rendered.contains("Reader"));
-        assert!(rendered.contains("data-view=\"book\""));
-        assert!(rendered.contains("data-view=\"overview\" hidden"));
-        assert!(rendered.contains("data-layout=\"spread\""));
-        assert!(rendered.contains("class=\"report-title\""));
-        assert!(rendered.contains("class=\"summary-title\""));
-        assert!(rendered.contains("data-current-page-label"));
-        assert!(rendered.contains("data-book-track"));
-        assert!(rendered.contains("Page 1 / 3"));
-        assert!(rendered.contains("data-diagram-modal"));
-        assert!(rendered.contains("data-diagram-trigger"));
-        assert!(rendered.contains("Click to enlarge"));
+        assert!(rendered.contains("class=\"sidebar\""));
+        assert!(rendered.contains("class=\"toc-link"));
+        assert!(rendered.contains("id=\"section-1\""));
+        assert!(rendered.contains("--bg: #131211"));
+        assert!(rendered.contains("data-theme-toggle"));
+        assert!(rendered.contains("[data-theme=\"light\"]"));
         assert!(rendered.contains("<link rel=\"icon\" href=\"data:,\">"));
         assert!(rendered.contains("<svg viewBox="));
         assert!(rendered.contains("ASCII fallback"));
         assert!(rendered.contains("color-scheme: dark;"));
-        assert!(!rendered.contains("color-scheme: light;"));
+        assert!(rendered.contains("color-scheme: light;"));
         assert!(!rendered.contains("cdn.jsdelivr"));
-        assert!(book_nav_css.contains("width: 100%;"));
-        assert!(!book_nav_css.contains("position: fixed;"));
-        assert!(!book_nav_css.contains("position: sticky;"));
+        assert!(!rendered.contains("Book View"));
+        assert!(!rendered.contains("data-book-track"));
+        assert!(!rendered.contains("data-diagram-modal"));
+        assert!(!rendered.contains("Click to enlarge"));
     }
 
     #[test]

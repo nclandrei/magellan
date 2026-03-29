@@ -15,18 +15,6 @@ fn fixture_path(relative: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join(relative)
 }
 
-fn css_block<'a>(html: &'a str, selector: &str) -> &'a str {
-    let marker = format!("{selector} {{");
-    let start = html
-        .find(&marker)
-        .unwrap_or_else(|| panic!("missing CSS block for {selector}"));
-    let rest = &html[start..];
-    let end = rest
-        .find("\n    }")
-        .unwrap_or_else(|| panic!("unterminated CSS block for {selector}"));
-    &rest[..end]
-}
-
 fn fixture_cases() -> [FixtureCase; 3] {
     [
         FixtureCase {
@@ -47,12 +35,12 @@ fn fixture_cases() -> [FixtureCase; 3] {
             ],
             html_markers: &[
                 "Magellan walkthrough",
-                "Book View",
-                "Overview",
+                "class=\"sidebar\"",
+                "class=\"toc-link",
                 "Sequence diagram",
                 "Flow diagram",
                 "Component diagram",
-                "Click to enlarge",
+                "ASCII fallback",
             ],
         },
         FixtureCase {
@@ -72,12 +60,12 @@ fn fixture_cases() -> [FixtureCase; 3] {
             ],
             html_markers: &[
                 "Magellan walkthrough",
-                "Book View",
-                "Overview",
+                "class=\"sidebar\"",
+                "class=\"toc-link",
                 "Timeline",
                 "Flow diagram",
                 "Verification",
-                "Click to enlarge",
+                "ASCII fallback",
             ],
         },
         FixtureCase {
@@ -92,12 +80,11 @@ fn fixture_cases() -> [FixtureCase; 3] {
             ],
             html_markers: &[
                 "Magellan walkthrough",
-                "Book View",
-                "Overview",
+                "class=\"sidebar\"",
+                "class=\"toc-link",
                 "Flow diagram",
                 "Before / after",
                 "ASCII fallback",
-                "Click to enlarge",
             ],
         },
     ]
@@ -208,27 +195,27 @@ fn checked_in_fixtures_render_expected_html_output() {
             );
         }
         assert!(
-            html.contains("data-book-track"),
-            "html render for {} should include the paged book track",
+            html.contains("class=\"sidebar\""),
+            "html render for {} should include the sidebar",
             case.path
         );
         assert!(
-            html.contains("data-view=\"overview\" hidden"),
-            "html render for {} should include the overview view",
+            html.contains("class=\"toc-link"),
+            "html render for {} should include toc links",
             case.path
         );
         assert!(
-            html.contains("data-diagram-modal"),
-            "html render for {} should include the diagram modal shell",
+            html.contains("data-theme-toggle"),
+            "html render for {} should include the theme toggle",
             case.path
         );
     }
 }
 
 #[test]
-fn session_fixture_html_includes_expected_book_paging_structure() {
+fn session_fixture_html_includes_expected_scroll_structure() {
     let temp_dir = tempfile::tempdir().expect("temp dir should be created");
-    let output_path = temp_dir.path().join("session-book.html");
+    let output_path = temp_dir.path().join("session-scroll.html");
 
     Command::cargo_bin("magellan")
         .expect("binary should build")
@@ -240,28 +227,24 @@ fn session_fixture_html_includes_expected_book_paging_structure() {
         .success();
 
     let html = fs::read_to_string(&output_path).expect("html output should be readable");
-    let page_count = html.matches("data-page-title=").count();
-    let dot_count = html.matches("data-page-dot=").count();
-    let trigger_count = html.matches("class=\"diagram-hitbox\"").count();
-    let template_count = html.matches("<template id=\"diagram-template-").count();
-    let book_nav_css = css_block(&html, ".book-nav");
+    let section_count = html.matches("class=\"section\"").count();
+    let verification_count = html.matches("class=\"section verification\"").count();
+    let toc_link_count = html.matches("class=\"toc-link").count();
+    let diagram_count = html.matches("class=\"diagram\"").count();
 
-    assert_eq!(page_count, 5, "summary + 3 sections + verification");
-    assert_eq!(dot_count, 5, "book navigation should mirror the page count");
+    assert_eq!(section_count, 3, "3 regular sections");
+    assert_eq!(verification_count, 1, "1 verification section");
     assert_eq!(
-        trigger_count, 3,
-        "book view should expose one trigger per section diagram"
+        toc_link_count, 5,
+        "summary + 3 sections + verification toc links"
     );
     assert_eq!(
-        template_count, 3,
-        "book view should include one modal template per section diagram"
+        diagram_count, 3,
+        "each section with a diagram should render one inline diagram"
     );
-    assert!(html.contains("class=\"report-title\""));
-    assert!(html.contains("data-current-page-label"));
-    assert!(html.contains("data-page-counter"));
-    assert!(html.contains("data-layout=\"spread\""));
-    assert!(!html.contains("Reader"));
-    assert!(book_nav_css.contains("width: 100%;"));
-    assert!(!book_nav_css.contains("position: fixed;"));
-    assert!(!book_nav_css.contains("position: sticky;"));
+    assert!(html.contains("class=\"sidebar\""));
+    assert!(html.contains("data-theme-toggle"));
+    assert!(html.contains("[data-theme=\"light\"]"));
+    assert!(!html.contains("data-book-track"));
+    assert!(!html.contains("Book View"));
 }

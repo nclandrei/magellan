@@ -39,7 +39,7 @@ fn prompt_question_flow_works_end_to_end_with_real_binary() {
     assert!(prompt.contains("inspect the current diff or commit range"));
     assert!(
         prompt.contains(
-            "Each section becomes a page in HTML book view, so keep one idea per section."
+            "Each section becomes a scrollable block in the HTML sidebar layout, so keep one idea per section."
         )
     );
 }
