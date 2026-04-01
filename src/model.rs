@@ -11,6 +11,8 @@ pub struct Document {
     pub sections: Vec<Section>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub verification: Option<Verification>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repo: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -19,6 +21,10 @@ pub struct Section {
     pub text: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub diagram: Option<Diagram>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub commit: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub files: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -397,16 +403,21 @@ mod tests {
                             },
                         ],
                     }),
+                    commit: None,
+                    files: vec![],
                 },
                 Section {
                     title: "Verification".into(),
                     text: vec!["We covered the regression with an integration test.".into()],
                     diagram: None,
+                    commit: None,
+                    files: vec![],
                 },
             ],
             verification: Some(Verification {
                 text: vec!["Manual verification and automated tests passed.".into()],
             }),
+            repo: None,
         }
     }
 

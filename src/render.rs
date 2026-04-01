@@ -51,6 +51,12 @@ fn render_terminal(document: &Document) -> String {
             "-".repeat(section.title.len())
         )
         .unwrap();
+        if let Some(sha) = &section.commit {
+            writeln!(&mut output, "commit: {sha}").unwrap();
+        }
+        if !section.files.is_empty() {
+            writeln!(&mut output, "files: {}", section.files.join(", ")).unwrap();
+        }
         writeln!(&mut output).unwrap();
         for paragraph in &section.text {
             writeln!(&mut output, "{paragraph}").unwrap();
@@ -89,6 +95,17 @@ fn render_markdown(document: &Document) -> String {
     for section in &document.sections {
         writeln!(&mut output, "## {}", section.title).unwrap();
         writeln!(&mut output).unwrap();
+        if section.commit.is_some() || !section.files.is_empty() {
+            let mut parts = Vec::new();
+            if let Some(sha) = &section.commit {
+                parts.push(format!("`{sha}`"));
+            }
+            for file in &section.files {
+                parts.push(format!("`{file}`"));
+            }
+            writeln!(&mut output, "{}", parts.join(" ")).unwrap();
+            writeln!(&mut output).unwrap();
+        }
         for paragraph in &section.text {
             writeln!(&mut output, "{paragraph}").unwrap();
             writeln!(&mut output).unwrap();
@@ -117,11 +134,12 @@ fn render_markdown(document: &Document) -> String {
 fn render_html(document: &Document) -> String {
     let summary_html = paragraphs_to_html(&document.summary);
     let toc_html = render_toc(document);
+    let repo = document.repo.as_deref();
     let sections_html = document
         .sections
         .iter()
         .enumerate()
-        .map(|(index, section)| render_section_html(index, section))
+        .map(|(index, section)| render_section_html(index, section, repo))
         .collect::<Vec<_>>()
         .join("\n");
     let verification_html = document
@@ -201,18 +219,21 @@ fn render_toc(document: &Document) -> String {
         .join("\n")
 }
 
-fn render_section_html(index: usize, section: &Section) -> String {
+fn render_section_html(index: usize, section: &Section, repo: Option<&str>) -> String {
     let diagram_html = section
         .diagram
         .as_ref()
         .map(|diagram| render_diagram_html(index, diagram))
         .unwrap_or_default();
 
+    let meta_html = render_section_meta(section, repo);
+
     format!(
         "    <section class=\"section\" id=\"section-{number}\">
       <div class=\"section-head\">
         <p class=\"eyebrow\">Step {number}</p>
         <h2>{title}</h2>
+        {meta_html}
       </div>
       <div class=\"section-body\">
         {text_html}
@@ -221,9 +242,67 @@ fn render_section_html(index: usize, section: &Section) -> String {
     </section>",
         number = index + 1,
         title = escape_html(&section.title),
+        meta_html = meta_html,
         text_html = paragraphs_to_html(&section.text),
         diagram_html = diagram_html
     )
+}
+
+fn render_section_meta(section: &Section, repo: Option<&str>) -> String {
+    let has_commit = section.commit.is_some();
+    let has_files = !section.files.is_empty();
+
+    if !has_commit && !has_files {
+        return String::new();
+    }
+
+    let repo_base = repo.map(|r| r.trim_end_matches('/'));
+
+    let mut chips = String::new();
+
+    if let Some(sha) = &section.commit {
+        let short = if sha.len() > 8 { &sha[..8] } else { sha };
+        if let Some(base) = repo_base {
+            write!(
+                &mut chips,
+                "<a class=\"meta-chip\" href=\"{base}/commit/{sha}\" target=\"_blank\" rel=\"noopener\">{short}</a>",
+                base = escape_html(base),
+                sha = escape_html(sha),
+                short = escape_html(short),
+            )
+            .unwrap();
+        } else {
+            write!(
+                &mut chips,
+                "<span class=\"meta-chip\">{short}</span>",
+                short = escape_html(short),
+            )
+            .unwrap();
+        }
+    }
+
+    for file in &section.files {
+        if let Some(base) = repo_base {
+            let blob_ref = section.commit.as_deref().unwrap_or("HEAD");
+            write!(
+                &mut chips,
+                "<a class=\"meta-chip\" href=\"{base}/blob/{blob_ref}/{file}\" target=\"_blank\" rel=\"noopener\">{file}</a>",
+                base = escape_html(base),
+                blob_ref = escape_html(blob_ref),
+                file = escape_html(file),
+            )
+            .unwrap();
+        } else {
+            write!(
+                &mut chips,
+                "<span class=\"meta-chip\">{file}</span>",
+                file = escape_html(file),
+            )
+            .unwrap();
+        }
+    }
+
+    format!("<div class=\"section-meta\">{chips}</div>")
 }
 
 fn render_verification_html(verification: &crate::model::Verification) -> String {
@@ -359,9 +438,6 @@ fn html_style() -> &'static str {
       font-size: 0.88rem;
       line-height: 1.4;
       transition: background-color 120ms ease, color 120ms ease;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
     }
     .toc-link:hover {
       color: var(--ink);
@@ -440,6 +516,29 @@ fn html_style() -> &'static str {
     }
     .section-head {
       margin-bottom: 16px;
+    }
+    .section-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .meta-chip {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.78rem;
+      line-height: 1.5;
+      text-decoration: none;
+      transition: color 120ms ease, border-color 120ms ease;
+    }
+    a.meta-chip:hover {
+      color: var(--ink);
+      border-color: var(--accent);
     }
     .section-body {
       max-width: 64ch;
@@ -1734,10 +1833,13 @@ mod tests {
                         },
                     ],
                 }),
+                commit: None,
+                files: vec![],
             }],
             verification: Some(Verification {
                 text: vec!["An integration test and a quick manual check passed.".into()],
             }),
+            repo: None,
         }
     }
 

@@ -48,6 +48,8 @@ fn walkthrough_example() -> Document {
                         },
                     ],
                 }),
+                commit: None,
+                files: vec![],
             },
             Section {
                 title: "Why this matters".into(),
@@ -70,6 +72,8 @@ fn walkthrough_example() -> Document {
                         },
                     ],
                 }),
+                commit: None,
+                files: vec![],
             },
         ],
         verification: Some(Verification {
@@ -77,6 +81,7 @@ fn walkthrough_example() -> Document {
                 "An integration test covered the regression and a manual form submission confirmed the new error state.".into(),
             ],
         }),
+        repo: None,
     }
 }
 
@@ -107,10 +112,13 @@ fn timeline_example() -> Document {
                     },
                 ],
             }),
+            commit: None,
+            files: vec![],
         }],
         verification: Some(Verification {
             text: vec!["Manual search checks and automated tests both passed.".into()],
         }),
+        repo: None,
     }
 }
 
@@ -137,10 +145,13 @@ fn before_after_example() -> Document {
                     "API only receives valid requests".into(),
                 ],
             })),
+            commit: None,
+            files: vec![],
         }],
         verification: Some(Verification {
             text: vec!["A regression test now covers the invalid submission path.".into()],
         }),
+        repo: None,
     }
 }
 
@@ -189,6 +200,8 @@ fn followup_example() -> Document {
                         },
                     ],
                 }),
+                commit: None,
+                files: vec![],
             },
             Section {
                 title: "Before and after the move".into(),
@@ -208,6 +221,8 @@ fn followup_example() -> Document {
                         "Retry guard decides locally before the external call".into(),
                     ],
                 })),
+                commit: None,
+                files: vec![],
             },
         ],
         verification: Some(Verification {
@@ -215,6 +230,7 @@ fn followup_example() -> Document {
                 "A worker-focused test now covers max-attempt handling, and a manual replay of a failed job confirmed that retries stop at the expected boundary.".into(),
             ],
         }),
+        repo: None,
     }
 }
 
