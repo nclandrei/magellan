@@ -518,6 +518,24 @@ fn html_style() -> &'static str {
       font-size: 1rem;
       line-height: 1.7;
     }
+    p code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.92em;
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 6px;
+      color: var(--ink);
+    }
+    p a {
+      color: var(--ink);
+      text-decoration: underline;
+      text-decoration-color: var(--accent);
+      text-underline-offset: 2px;
+    }
+    p a:hover {
+      text-decoration-color: var(--accent-strong);
+    }
     .section {
       padding: 28px 0;
       border-top: 1px solid var(--border);
@@ -1492,9 +1510,111 @@ fn estimate_text_width(text: &str, min: i32, max: i32) -> i32 {
 fn paragraphs_to_html(paragraphs: &[String]) -> String {
     paragraphs
         .iter()
-        .map(|paragraph| format!("<p>{}</p>", escape_html(paragraph)))
+        .map(|paragraph| format!("<p>{}</p>", format_inline_html(paragraph)))
         .collect::<Vec<_>>()
         .join("")
+}
+
+/// Converts a single paragraph to HTML, escaping user content and then
+/// applying minimal inline formatting: backtick-delimited spans become
+/// `<code>`, and `[text](http(s)://...)` becomes an `<a>` with a safe target.
+///
+/// Escaping runs first so any generated tags wrap already-escaped content.
+fn format_inline_html(text: &str) -> String {
+    let mut output = String::with_capacity(text.len());
+    let mut rest = text;
+
+    while !rest.is_empty() {
+        if let Some(start) = rest.find('`') {
+            // Emit everything before the backtick, with link substitution.
+            output.push_str(&format_links(&escape_html(&rest[..start])));
+            let after_open = &rest[start + 1..];
+            if let Some(end) = after_open.find('`') {
+                let code = &after_open[..end];
+                output.push_str("<code>");
+                output.push_str(&escape_html(code));
+                output.push_str("</code>");
+                rest = &after_open[end + 1..];
+                continue;
+            }
+            // Unmatched backtick: treat as a literal and stop hunting.
+            output.push_str(&format_links(&escape_html(&rest[start..])));
+            return output;
+        }
+
+        output.push_str(&format_links(&escape_html(rest)));
+        return output;
+    }
+
+    output
+}
+
+/// Replaces `[text](url)` spans with `<a>` tags. Only accepts http and https
+/// URLs so that escaped markdown like `[x](javascript:...)` stays inert.
+///
+/// Operates on an already-HTML-escaped slice so `escape_html` does not have
+/// to round-trip through the link text.
+fn format_links(escaped: &str) -> String {
+    let mut output = String::with_capacity(escaped.len());
+    let bytes = escaped.as_bytes();
+    let mut i = 0;
+
+    while i < bytes.len() {
+        if bytes[i] == b'['
+            && let Some((text, url, consumed)) = parse_link(&escaped[i..])
+        {
+            output.push_str("<a href=\"");
+            output.push_str(&url);
+            output.push_str("\" target=\"_blank\" rel=\"noopener\">");
+            output.push_str(&text);
+            output.push_str("</a>");
+            i += consumed;
+            continue;
+        }
+        // Not a link start (or not a valid link): copy the byte.
+        let ch_start = i;
+        while i < bytes.len() && bytes[i] != b'[' {
+            i += 1;
+            if i == ch_start + 1 && ch_start + 1 < bytes.len() && bytes[ch_start] >= 0x80 {
+                // For UTF-8 continuation bytes, just advance one at a time; the
+                // push_str slice below remains valid because we always split at
+                // char boundaries thanks to searching for single-byte markers.
+                break;
+            }
+        }
+        output.push_str(&escaped[ch_start..i]);
+        if i == ch_start {
+            // No progress was made (shouldn't happen given the loop condition);
+            // bail out to avoid an infinite loop.
+            break;
+        }
+    }
+
+    output
+}
+
+/// Attempts to parse `[text](url)` starting at the opening bracket. Returns
+/// the HTML-ready text, the HTML-ready URL, and the number of bytes consumed
+/// from the input slice.
+fn parse_link(rest: &str) -> Option<(String, String, usize)> {
+    debug_assert!(rest.starts_with('['));
+    let after_open = &rest[1..];
+    let text_end = after_open.find(']')?;
+    let text = &after_open[..text_end];
+    let after_text = &after_open[text_end + 1..];
+    if !after_text.starts_with('(') {
+        return None;
+    }
+    let after_paren = &after_text[1..];
+    let url_end = after_paren.find(')')?;
+    let url = &after_paren[..url_end];
+
+    if !(url.starts_with("http://") || url.starts_with("https://")) {
+        return None;
+    }
+
+    let consumed = 1 + text_end + 1 + 1 + url_end + 1;
+    Some((text.to_string(), url.to_string(), consumed))
 }
 
 fn diagram_title(diagram: &Diagram) -> &'static str {
@@ -2008,6 +2128,131 @@ mod tests {
             verification: None,
             repo: None,
         }
+    }
+
+    #[test]
+    fn html_renders_inline_code_and_links_in_paragraphs() {
+        let doc = Document {
+            title: "Inline formatting".into(),
+            summary: vec![
+                "See the `Order` type in [the schema](https://example.com/schema) for details.".into(),
+            ],
+            sections: vec![
+                Section {
+                    title: "Request flow".into(),
+                    text: vec![
+                        "Call `validate_request(payload)` before [enqueueing](https://example.com/queue).".into(),
+                    ],
+                    diagram: None,
+                    commit: None,
+                    files: vec![],
+                },
+                Section {
+                    title: "Verification".into(),
+                    text: vec!["Tests use `assert_eq!` throughout.".into()],
+                    diagram: None,
+                    commit: None,
+                    files: vec![],
+                },
+            ],
+            verification: None,
+            repo: None,
+        };
+
+        let html = render_document(&doc, OutputFormat::Html);
+
+        assert!(
+            html.contains("<code>Order</code>"),
+            "summary inline code should become <code>"
+        );
+        assert!(
+            html.contains("<a href=\"https://example.com/schema\""),
+            "summary inline link should become <a>"
+        );
+        assert!(
+            html.contains("<code>validate_request(payload)</code>"),
+            "section inline code should become <code>"
+        );
+        assert!(
+            html.contains("<a href=\"https://example.com/queue\""),
+            "section inline link should become <a>"
+        );
+        assert!(
+            html.contains("<code>assert_eq!</code>"),
+            "later paragraphs should still get inline code rendering"
+        );
+        assert!(
+            !html.contains("`Order`") && !html.contains("`validate_request(payload)`"),
+            "raw backticks should not leak into the rendered HTML"
+        );
+    }
+
+    #[test]
+    fn html_inline_formatting_escapes_user_content() {
+        let doc = Document {
+            title: "Escaping".into(),
+            summary: vec!["Plain summary.".into()],
+            sections: vec![
+                Section {
+                    title: "Danger".into(),
+                    text: vec!["Call `<script>alert(1)</script>` for fun.".into()],
+                    diagram: None,
+                    commit: None,
+                    files: vec![],
+                },
+                Section {
+                    title: "More".into(),
+                    text: vec!["Second section.".into()],
+                    diagram: None,
+                    commit: None,
+                    files: vec![],
+                },
+            ],
+            verification: None,
+            repo: None,
+        };
+
+        let html = render_document(&doc, OutputFormat::Html);
+
+        assert!(
+            html.contains("<code>&lt;script&gt;alert(1)&lt;/script&gt;</code>"),
+            "inline code contents must be HTML-escaped"
+        );
+        assert!(
+            !html.contains("<script>alert(1)</script>"),
+            "raw script tags must never reach the output"
+        );
+    }
+
+    #[test]
+    fn markdown_passes_inline_formatting_through_unchanged() {
+        let doc = Document {
+            title: "Markdown".into(),
+            summary: vec!["Plain summary.".into()],
+            sections: vec![
+                Section {
+                    title: "Code".into(),
+                    text: vec!["Use `cargo test` often.".into()],
+                    diagram: None,
+                    commit: None,
+                    files: vec![],
+                },
+                Section {
+                    title: "Links".into(),
+                    text: vec!["See [docs](https://example.com).".into()],
+                    diagram: None,
+                    commit: None,
+                    files: vec![],
+                },
+            ],
+            verification: None,
+            repo: None,
+        };
+
+        let rendered = render_document(&doc, OutputFormat::Markdown);
+
+        assert!(rendered.contains("Use `cargo test` often."));
+        assert!(rendered.contains("See [docs](https://example.com)."));
     }
 
     #[test]
