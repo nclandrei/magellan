@@ -290,6 +290,10 @@ The repository ships with compact example payloads you can validate and render d
 - [`examples/session-walkthrough.json`](examples/session-walkthrough.json)
 - [`examples/branch-handoff-timeline.json`](examples/branch-handoff-timeline.json)
 - [`examples/followup-validation-question.json`](examples/followup-validation-question.json)
+- [`examples/state-machine-order-lifecycle.json`](examples/state-machine-order-lifecycle.json)
+- [`examples/layer-stack-request-pipeline.json`](examples/layer-stack-request-pipeline.json)
+- [`examples/table-permission-matrix.json`](examples/table-permission-matrix.json)
+- [`examples/dependency-tree-service-modules.json`](examples/dependency-tree-service-modules.json)
 
 For example:
 

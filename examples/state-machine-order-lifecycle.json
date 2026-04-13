@@ -1,0 +1,39 @@
+{
+  "title": "State machine: order lifecycle after the refund refactor",
+  "summary": [
+    "The order lifecycle now has an explicit Refunded terminal state so support tooling no longer has to infer refunds from payment metadata.",
+    "Transitions between Paid, Fulfilled, and Refunded are all event-driven and modeled in a single state machine rather than scattered across services."
+  ],
+  "sections": [
+    {
+      "title": "Order lifecycle states",
+      "text": [
+        "Orders flow from Pending to Paid, then Fulfilled, with Refunded as a terminal branch off either Paid or Fulfilled.",
+        "A Cancelled branch still exists from Pending for orders that never reach Paid."
+      ],
+      "diagram": {
+        "type": "state_machine",
+        "states": ["Pending", "Paid", "Fulfilled", "Refunded", "Cancelled"],
+        "transitions": [
+          { "from": "Pending", "to": "Paid", "label": "place order" },
+          { "from": "Pending", "to": "Cancelled", "label": "abandon" },
+          { "from": "Paid", "to": "Fulfilled", "label": "ship" },
+          { "from": "Paid", "to": "Refunded", "label": "refund before ship" },
+          { "from": "Fulfilled", "to": "Refunded", "label": "refund after ship" }
+        ]
+      }
+    },
+    {
+      "title": "Why a dedicated state machine",
+      "text": [
+        "Previously the lifecycle was derived from two flags and a payment record, which made reporting unreliable.",
+        "A single state field makes dashboards and ops tooling consistent without joining across services."
+      ]
+    }
+  ],
+  "verification": {
+    "text": [
+      "State transitions are covered by unit tests, and a manual replay of a sample order exercised every edge in the diagram."
+    ]
+  }
+}

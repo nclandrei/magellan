@@ -1,0 +1,39 @@
+{
+  "title": "Layer stack: inbound request pipeline",
+  "summary": [
+    "Inbound requests now flow through a fixed vertical pipeline so routing, auth, and rate limiting each live in a dedicated layer.",
+    "Each layer can fail fast on its own concern, which makes debugging a bad request a matter of finding which layer dropped it."
+  ],
+  "sections": [
+    {
+      "title": "Pipeline layers",
+      "text": [
+        "The edge CDN caches static responses, the load balancer handles TLS and routing, and the auth gateway validates tokens before anything else runs.",
+        "Rate limits, then the application handler and the database come last so request work only happens when all earlier checks succeed."
+      ],
+      "diagram": {
+        "type": "layer_stack",
+        "layers": [
+          "Edge CDN",
+          "Load Balancer",
+          "Auth Gateway",
+          "Rate Limiter",
+          "Application Handler",
+          "Primary Database"
+        ]
+      }
+    },
+    {
+      "title": "Why layering matters here",
+      "text": [
+        "Before this change, auth and rate limiting sometimes ran inside the application handler, so a noisy client could wake up business logic before being rejected.",
+        "Pinning the order in this layer stack keeps cheap checks in front of expensive ones."
+      ]
+    }
+  ],
+  "verification": {
+    "text": [
+      "Synthetic requests that fail at each layer are covered by integration tests so the ordering stays fixed."
+    ]
+  }
+}

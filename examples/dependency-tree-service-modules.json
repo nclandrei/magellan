@@ -1,0 +1,57 @@
+{
+  "title": "Dependency tree: payment service module layout",
+  "summary": [
+    "This tree shows how the payment service is wired internally after the module cleanup.",
+    "It highlights which subsystems depend on which shared libraries, so a reviewer can quickly locate the blast radius of a change."
+  ],
+  "sections": [
+    {
+      "title": "Service module layout",
+      "text": [
+        "Everything hangs off the payment_service root. API, worker, and shared live one level down, and everything below them is leaf code.",
+        "Shared modules are used by both the API and the worker, so changes there touch both entry points."
+      ],
+      "diagram": {
+        "type": "dependency_tree",
+        "root": "payment_service",
+        "children": [
+          {
+            "label": "api",
+            "children": [
+              { "label": "routes" },
+              { "label": "handlers" },
+              { "label": "schemas" }
+            ]
+          },
+          {
+            "label": "worker",
+            "children": [
+              { "label": "job_runner" },
+              { "label": "retry_guard" }
+            ]
+          },
+          {
+            "label": "shared",
+            "children": [
+              { "label": "telemetry" },
+              { "label": "errors" },
+              { "label": "config" }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "title": "Why the layout matters",
+      "text": [
+        "Reviewers can use this tree to predict which tests to run when a shared module changes.",
+        "It also makes it obvious when a new dependency is sneaking in from an unexpected place."
+      ]
+    }
+  ],
+  "verification": {
+    "text": [
+      "The module boundaries are enforced by a build-time check, and this tree is regenerated from the same metadata the check uses."
+    ]
+  }
+}
