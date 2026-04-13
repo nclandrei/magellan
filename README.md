@@ -52,6 +52,20 @@ magellan prompt --agent-type codex --source diff --goal followup --question "why
 magellan prompt --agent-type claude --source branch --goal handoff --scope backend --scope tests
 ```
 
+## The mandatory final step: `magellan go`
+
+After the agent writes the JSON payload, the expected final step is a single
+command that validates, renders HTML, opens it in the browser, and writes a
+markdown file alongside:
+
+```bash
+magellan go --input /tmp/magellan.json
+```
+
+Use `go` instead of stringing `validate` and `render` together yourself. The
+rendered HTML and markdown files are the deliverable — a prose summary in chat
+is not a substitute.
+
 ## Help
 
 ```text
@@ -63,6 +77,7 @@ An agent or engineer gathers evidence, writes a structured JSON payload, and
 then uses Magellan to validate and render that payload.
 
 Usage:
+  magellan go --input <payload.json|-> [--out <path>] [--markdown-out <path>]
   magellan schema
   magellan prompt --agent-type <codex|claude> [--source <session|diff|branch|pr>] [--goal <walkthrough|followup|handoff>] [options]
   magellan example --preset <walkthrough|timeline|before-after|followup>
@@ -71,6 +86,7 @@ Usage:
   magellan guide
 
 Commands:
+  go        Validate, render HTML, open it, and write markdown — all in one step.
   schema    Print the JSON Schema for Magellan's input payload.
   prompt    Print an agent-oriented prompt template for producing a Magellan walkthrough.
   example   Print a starter payload that agents can edit before rendering.
@@ -100,12 +116,8 @@ Normal workflow:
      - `summary`
      - `sections`
      - optional `verification`
-  4. Validate the payload.
-     - run: `magellan validate --input /tmp/magellan.json`
-  5. Render the final artifact.
-     - terminal: `magellan render --input /tmp/magellan.json --format terminal`
-     - markdown: `magellan render --input /tmp/magellan.json --format markdown`
-     - html: `magellan render --input /tmp/magellan.json --format html --open`
+  4. Validate and render. This step is mandatory, do not skip it.
+     - run: `magellan go --input /tmp/magellan.json`
 
 Common requests:
   Explain the last commit:
@@ -207,22 +219,32 @@ Fast paths:
 
   Prepare a handoff:
   - `magellan prompt --agent-type claude --source branch --goal handoff --scope backend --scope tests`
+
+  Validate and render (the mandatory final step):
+  - `magellan go --input /tmp/magellan.json`
 ```
 
 ## Example
 
-Start with a built-in payload, validate it, then render it in the format you need:
+Start with a built-in payload, then use `magellan go` to validate, open the HTML
+report in the browser, and write the markdown alongside in one step:
 
 ```bash
-magellan example --preset walkthrough > walkthrough.json
-magellan example --preset followup > followup.json
-magellan validate --input walkthrough.json
-magellan render --input walkthrough.json --format terminal
-magellan render --input walkthrough.json --format markdown > walkthrough.md
-magellan render --input walkthrough.json --format html --out /tmp/magellan.html --open
+magellan example --preset walkthrough > /tmp/magellan.json
+magellan go --input /tmp/magellan.json
 ```
 
-`--input -` reads JSON from stdin, so an agent can pipe a payload directly into `validate` or `render`.
+If you need finer control, `render` is still available for one-off format
+targets:
+
+```bash
+magellan render --input /tmp/magellan.json --format terminal
+magellan render --input /tmp/magellan.json --format markdown > walkthrough.md
+magellan render --input /tmp/magellan.json --format html --out /tmp/magellan.html --open
+```
+
+`--input -` reads JSON from stdin, so an agent can pipe a payload directly into
+`go`, `validate`, or `render`.
 
 ## Payload shape
 

@@ -490,6 +490,24 @@ fn readme_does_not_advertise_book_view() {
 }
 
 #[test]
+fn readme_documents_the_mandatory_go_command() {
+    let readme = fs::read_to_string("README.md").expect("README.md should be readable");
+
+    assert!(
+        readme.contains("magellan go"),
+        "README.md must document the `magellan go` command"
+    );
+    assert!(
+        readme.contains("go        Validate, render HTML, open it, and write markdown"),
+        "README.md command list should describe what `go` does"
+    );
+    assert!(
+        readme.contains("magellan go --input /tmp/magellan.json"),
+        "README.md should include a concrete `magellan go` invocation example"
+    );
+}
+
+#[test]
 fn agent_docs_do_not_contradict_renderer_with_book_view() {
     for path in ["CLAUDE.md", "AGENTS.md"] {
         let contents = fs::read_to_string(path)
