@@ -489,6 +489,20 @@ fn readme_does_not_advertise_book_view() {
     );
 }
 
+#[test]
+fn agent_docs_do_not_contradict_renderer_with_book_view() {
+    for path in ["CLAUDE.md", "AGENTS.md"] {
+        let contents = fs::read_to_string(path)
+            .unwrap_or_else(|_| panic!("{path} should be readable"));
+        let lower = contents.to_lowercase();
+
+        assert!(
+            !lower.contains("book view") && !lower.contains("book-mode"),
+            "{path} must not reference the removed book view / book mode"
+        );
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
