@@ -25,6 +25,12 @@ fn sample_payload() -> &'static str {
           { "from": "Form", "to": "API", "label": "valid request" }
         ]
       }
+    },
+    {
+      "title": "Why it matters",
+      "text": [
+        "Feedback arrives before a round-trip, so broken submissions never reach the backend."
+      ]
     }
   ],
   "verification": {
@@ -33,6 +39,30 @@ fn sample_payload() -> &'static str {
     ]
   }
 }"#
+}
+
+#[test]
+fn example_command_has_a_handoff_preset() {
+    let temp_dir = tempfile::tempdir().expect("temp dir should be created");
+    let payload_path = temp_dir.path().join("handoff.json");
+
+    let output = Command::cargo_bin("magellan")
+        .expect("binary should build")
+        .args(["example", "--preset", "handoff"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    fs::write(&payload_path, &output).expect("payload should be written");
+
+    Command::cargo_bin("magellan")
+        .expect("binary should build")
+        .args(["validate", "--input"])
+        .arg(&payload_path)
+        .assert()
+        .success();
 }
 
 #[test]
@@ -303,7 +333,7 @@ fn prompt_command_can_customize_topic_source_goal_artifact_and_focus() {
             "optimize for another engineer picking up the work quickly, including decisions and verification",
         ))
         .stdout(predicate::str::contains(
-            "magellan go --input /tmp/session-walkthrough.json",
+            "magellan render --input /tmp/session-walkthrough.json --format markdown --out /tmp/session-walkthrough.md",
         ))
         .stdout(predicate::str::contains(
             "- prioritize what the system now does differently for the user or caller",

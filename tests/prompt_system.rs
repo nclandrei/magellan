@@ -22,8 +22,6 @@ fn prompt_question_flow_works_end_to_end_with_real_binary() {
             "why did this validation path change?",
             "--artifact",
             "/tmp/question-flow.json",
-            "--render-format",
-            "markdown",
         ])
         .assert()
         .success()
@@ -92,6 +90,64 @@ fn prompt_scope_flow_works_end_to_end_with_real_binary() {
     assert!(prompt.contains("keep the walkthrough centered on this scope: tests"));
     assert!(prompt.contains("magellan go --input /tmp/scope-flow.json"));
     assert!(prompt.contains("optimize for another engineer picking up the work quickly"));
+}
+
+#[test]
+fn prompt_render_format_markdown_is_reflected_in_output() {
+    let output = Command::cargo_bin("magellan")
+        .expect("binary should build")
+        .args([
+            "prompt",
+            "--agent-type",
+            "codex",
+            "--render-format",
+            "markdown",
+            "--artifact",
+            "/tmp/render-format.json",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let prompt = String::from_utf8(output).expect("prompt output should be utf-8");
+
+    assert!(
+        prompt.contains("markdown"),
+        "prompt should mention the requested markdown render target"
+    );
+    assert!(
+        !prompt.contains("renders HTML (opens it in the browser)"),
+        "prompt should not force HTML when markdown is requested"
+    );
+}
+
+#[test]
+fn prompt_render_format_terminal_is_reflected_in_output() {
+    let output = Command::cargo_bin("magellan")
+        .expect("binary should build")
+        .args([
+            "prompt",
+            "--agent-type",
+            "claude",
+            "--render-format",
+            "terminal",
+            "--artifact",
+            "/tmp/terminal-format.json",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let prompt = String::from_utf8(output).expect("prompt output should be utf-8");
+
+    assert!(
+        prompt.contains("terminal"),
+        "prompt should mention the requested terminal render target"
+    );
 }
 
 #[test]

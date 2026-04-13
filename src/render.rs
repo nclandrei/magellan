@@ -112,10 +112,18 @@ fn render_markdown(document: &Document) -> String {
         }
 
         if let Some(diagram) = &section.diagram {
-            writeln!(&mut output, "```mermaid").unwrap();
-            writeln!(&mut output, "{}", render_mermaid_diagram(diagram)).unwrap();
-            writeln!(&mut output, "```").unwrap();
-            writeln!(&mut output).unwrap();
+            match diagram {
+                Diagram::Table { headers, rows } => {
+                    writeln!(&mut output, "{}", render_markdown_table(headers, rows)).unwrap();
+                    writeln!(&mut output).unwrap();
+                }
+                _ => {
+                    writeln!(&mut output, "```mermaid").unwrap();
+                    writeln!(&mut output, "{}", render_mermaid_diagram(diagram)).unwrap();
+                    writeln!(&mut output, "```").unwrap();
+                    writeln!(&mut output).unwrap();
+                }
+            }
         }
     }
 
@@ -510,6 +518,24 @@ fn html_style() -> &'static str {
       font-size: 1rem;
       line-height: 1.7;
     }
+    p code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.92em;
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 6px;
+      color: var(--ink);
+    }
+    p a {
+      color: var(--ink);
+      text-decoration: underline;
+      text-decoration-color: var(--accent);
+      text-underline-offset: 2px;
+    }
+    p a:hover {
+      text-decoration-color: var(--accent-strong);
+    }
     .section {
       padding: 28px 0;
       border-top: 1px solid var(--border);
@@ -788,7 +814,7 @@ fn render_svg_diagram(index: usize, diagram: &Diagram) -> String {
         Diagram::StateMachine {
             states,
             transitions,
-        } => render_graph_svg(&diagram_id, "State machine", states, transitions),
+        } => render_state_machine_svg(&diagram_id, states, transitions),
         Diagram::Table { headers, rows } => render_table_svg(&diagram_id, headers, rows),
         Diagram::DependencyTree { root, children } => {
             render_dependency_tree_svg(&diagram_id, root, children)
@@ -1127,6 +1153,160 @@ fn render_layer_stack_svg(id: &str, layers: &[String]) -> String {
     svg_shell(id, width, height.max(120), &marker_id, "Layer stack", &body)
 }
 
+fn render_state_machine_svg(id: &str, states: &[String], transitions: &[Edge]) -> String {
+    let ordered = ordered_nodes(states, transitions);
+    let wrapped_states = ordered
+        .iter()
+        .map(|state| wrap_text(state, 16))
+        .collect::<Vec<_>>();
+
+    let columns = ordered.len().clamp(1, 3);
+    let rows = ordered.len().div_ceil(columns).max(1);
+    let box_width = wrapped_states
+        .iter()
+        .flat_map(|lines| lines.iter())
+        .map(|line| estimate_text_width(line, 124, 200))
+        .max()
+        .unwrap_or(124);
+    let box_height = wrapped_states
+        .iter()
+        .map(|lines| 28 + (lines.len() as i32 * 16))
+        .max()
+        .unwrap_or(60);
+
+    let padding = 36;
+    let gap_x = 64;
+    let gap_y = 82;
+    // Extra left padding so the start marker fits in front of the first state.
+    let left_inset = 28;
+
+    let width = padding * 2
+        + left_inset
+        + columns as i32 * box_width
+        + (columns.saturating_sub(1)) as i32 * gap_x;
+    let height = padding * 2 + rows as i32 * box_height + (rows.saturating_sub(1)) as i32 * gap_y;
+    let marker_id = format!("{id}-arrow");
+
+    let positions = ordered
+        .iter()
+        .enumerate()
+        .map(|(index, state)| {
+            let row = index / columns;
+            let col = index % columns;
+            let x = padding + left_inset + col as i32 * (box_width + gap_x);
+            let y = padding + row as i32 * (box_height + gap_y);
+            (state.as_str(), (x, y))
+        })
+        .collect::<Vec<_>>();
+
+    let mut body = String::new();
+
+    // Start marker: a small filled circle connected to the first state.
+    if let Some((_, (first_x, first_y))) = positions.first() {
+        let cx = first_x - 18;
+        let cy = first_y + box_height / 2;
+        write!(
+            &mut body,
+            "<circle class=\"state-start\" cx=\"{cx}\" cy=\"{cy}\" r=\"5\"/>"
+        )
+        .unwrap();
+        write!(
+            &mut body,
+            "<line class=\"connector\" x1=\"{}\" y1=\"{cy}\" x2=\"{}\" y2=\"{cy}\" marker-end=\"url(#{marker_id})\"/>",
+            cx + 5,
+            first_x
+        )
+        .unwrap();
+    }
+
+    for edge in transitions {
+        let Some((from_x, from_y)) = positions
+            .iter()
+            .find(|(node, _)| *node == edge.from.as_str())
+            .map(|(_, position)| *position)
+        else {
+            continue;
+        };
+
+        if edge.from == edge.to {
+            // Self-loop: draw a small arc above the state box.
+            let center_x = from_x + box_width / 2;
+            let top_y = from_y;
+            let loop_radius = 18;
+            let loop_left = center_x - loop_radius;
+            let loop_right = center_x + loop_radius;
+            let loop_top = top_y - 26;
+            write!(
+                &mut body,
+                "<path class=\"self-loop\" d=\"M {loop_left} {top_y} C {loop_left} {loop_top}, {loop_right} {loop_top}, {loop_right} {top_y}\" fill=\"none\" marker-end=\"url(#{marker_id})\"/>"
+            )
+            .unwrap();
+
+            if let Some(label) = &edge.label {
+                write_multiline_svg_text(
+                    &mut body,
+                    center_x,
+                    loop_top - 2,
+                    &wrap_text(label, 14),
+                    "middle",
+                    "edge-copy",
+                );
+            }
+            continue;
+        }
+
+        let Some((to_x, to_y)) = positions
+            .iter()
+            .find(|(node, _)| *node == edge.to.as_str())
+            .map(|(_, position)| *position)
+        else {
+            continue;
+        };
+
+        let start_x = from_x + box_width / 2;
+        let start_y = from_y + box_height / 2;
+        let end_x = to_x + box_width / 2;
+        let end_y = to_y + box_height / 2;
+
+        write!(
+            &mut body,
+            "<line class=\"connector\" x1=\"{start_x}\" y1=\"{start_y}\" x2=\"{end_x}\" y2=\"{end_y}\" marker-end=\"url(#{marker_id})\"/>"
+        )
+        .unwrap();
+
+        if let Some(label) = &edge.label {
+            write_multiline_svg_text(
+                &mut body,
+                (start_x + end_x) / 2,
+                (start_y + end_y) / 2 - 8,
+                &wrap_text(label, 14),
+                "middle",
+                "edge-copy",
+            );
+        }
+    }
+
+    for ((_, (x, y)), lines) in positions.iter().zip(wrapped_states.iter()) {
+        let center_x = *x + box_width / 2;
+        write!(
+            &mut body,
+            "<rect class=\"state-node\" x=\"{}\" y=\"{}\" width=\"{box_width}\" height=\"{box_height}\" rx=\"22\" ry=\"22\"/>",
+            x, y
+        )
+        .unwrap();
+        write_multiline_svg_text(&mut body, center_x, *y + 28, lines, "middle", "node-copy");
+    }
+
+    svg_shell(
+        id,
+        width.max(360),
+        height.max(200),
+        &marker_id,
+        "State machine",
+        &body,
+    )
+}
+
 fn render_dependency_tree_svg(id: &str, root: &str, children: &[TreeNode]) -> String {
     let padding = 24;
     let row_height = 32;
@@ -1307,6 +1487,21 @@ fn svg_shell(
       stroke: var(--diagram-stroke, rgba(160, 152, 144, 0.4));
       stroke-width: 1;
     }}
+    .state-node {{
+      fill: var(--diagram-node-fill, #1b1a18);
+      stroke: var(--diagram-stroke, rgba(160, 152, 144, 0.55));
+      stroke-width: 1.5;
+    }}
+    .state-start {{
+      fill: var(--diagram-dot, rgba(160, 152, 144, 0.85));
+      stroke: var(--diagram-dot-ring, rgba(160, 152, 144, 0.2));
+      stroke-width: 2;
+    }}
+    .self-loop {{
+      stroke: var(--diagram-stroke, rgba(160, 152, 144, 0.6));
+      stroke-width: 1.5;
+      fill: none;
+    }}
     .lane {{
       stroke: var(--diagram-lane, rgba(255, 255, 255, 0.12));
       stroke-width: 1;
@@ -1484,9 +1679,111 @@ fn estimate_text_width(text: &str, min: i32, max: i32) -> i32 {
 fn paragraphs_to_html(paragraphs: &[String]) -> String {
     paragraphs
         .iter()
-        .map(|paragraph| format!("<p>{}</p>", escape_html(paragraph)))
+        .map(|paragraph| format!("<p>{}</p>", format_inline_html(paragraph)))
         .collect::<Vec<_>>()
         .join("")
+}
+
+/// Converts a single paragraph to HTML, escaping user content and then
+/// applying minimal inline formatting: backtick-delimited spans become
+/// `<code>`, and `[text](http(s)://...)` becomes an `<a>` with a safe target.
+///
+/// Escaping runs first so any generated tags wrap already-escaped content.
+fn format_inline_html(text: &str) -> String {
+    let mut output = String::with_capacity(text.len());
+    let mut rest = text;
+
+    while !rest.is_empty() {
+        if let Some(start) = rest.find('`') {
+            // Emit everything before the backtick, with link substitution.
+            output.push_str(&format_links(&escape_html(&rest[..start])));
+            let after_open = &rest[start + 1..];
+            if let Some(end) = after_open.find('`') {
+                let code = &after_open[..end];
+                output.push_str("<code>");
+                output.push_str(&escape_html(code));
+                output.push_str("</code>");
+                rest = &after_open[end + 1..];
+                continue;
+            }
+            // Unmatched backtick: treat as a literal and stop hunting.
+            output.push_str(&format_links(&escape_html(&rest[start..])));
+            return output;
+        }
+
+        output.push_str(&format_links(&escape_html(rest)));
+        return output;
+    }
+
+    output
+}
+
+/// Replaces `[text](url)` spans with `<a>` tags. Only accepts http and https
+/// URLs so that escaped markdown like `[x](javascript:...)` stays inert.
+///
+/// Operates on an already-HTML-escaped slice so `escape_html` does not have
+/// to round-trip through the link text.
+fn format_links(escaped: &str) -> String {
+    let mut output = String::with_capacity(escaped.len());
+    let bytes = escaped.as_bytes();
+    let mut i = 0;
+
+    while i < bytes.len() {
+        if bytes[i] == b'['
+            && let Some((text, url, consumed)) = parse_link(&escaped[i..])
+        {
+            output.push_str("<a href=\"");
+            output.push_str(&url);
+            output.push_str("\" target=\"_blank\" rel=\"noopener\">");
+            output.push_str(&text);
+            output.push_str("</a>");
+            i += consumed;
+            continue;
+        }
+        // Not a link start (or not a valid link): copy the byte.
+        let ch_start = i;
+        while i < bytes.len() && bytes[i] != b'[' {
+            i += 1;
+            if i == ch_start + 1 && ch_start + 1 < bytes.len() && bytes[ch_start] >= 0x80 {
+                // For UTF-8 continuation bytes, just advance one at a time; the
+                // push_str slice below remains valid because we always split at
+                // char boundaries thanks to searching for single-byte markers.
+                break;
+            }
+        }
+        output.push_str(&escaped[ch_start..i]);
+        if i == ch_start {
+            // No progress was made (shouldn't happen given the loop condition);
+            // bail out to avoid an infinite loop.
+            break;
+        }
+    }
+
+    output
+}
+
+/// Attempts to parse `[text](url)` starting at the opening bracket. Returns
+/// the HTML-ready text, the HTML-ready URL, and the number of bytes consumed
+/// from the input slice.
+fn parse_link(rest: &str) -> Option<(String, String, usize)> {
+    debug_assert!(rest.starts_with('['));
+    let after_open = &rest[1..];
+    let text_end = after_open.find(']')?;
+    let text = &after_open[..text_end];
+    let after_text = &after_open[text_end + 1..];
+    if !after_text.starts_with('(') {
+        return None;
+    }
+    let after_paren = &after_text[1..];
+    let url_end = after_paren.find(')')?;
+    let url = &after_paren[..url_end];
+
+    if !(url.starts_with("http://") || url.starts_with("https://")) {
+        return None;
+    }
+
+    let consumed = 1 + text_end + 1 + 1 + url_end + 1;
+    Some((text.to_string(), url.to_string(), consumed))
 }
 
 fn diagram_title(diagram: &Diagram) -> &'static str {
@@ -1614,6 +1911,46 @@ fn render_ascii_edges(title: &str, edges: &[Edge]) -> String {
         }
     }
     output.trim_end().to_owned()
+}
+
+fn render_markdown_table(headers: &[String], rows: &[Vec<String>]) -> String {
+    let mut output = String::new();
+    output.push_str("| ");
+    output.push_str(
+        &headers
+            .iter()
+            .map(|header| escape_markdown_cell(header))
+            .collect::<Vec<_>>()
+            .join(" | "),
+    );
+    output.push_str(" |\n");
+
+    output.push_str("| ");
+    output.push_str(
+        &headers
+            .iter()
+            .map(|_| "---".to_string())
+            .collect::<Vec<_>>()
+            .join(" | "),
+    );
+    output.push_str(" |\n");
+
+    for row in rows {
+        output.push_str("| ");
+        output.push_str(
+            &row.iter()
+                .map(|cell| escape_markdown_cell(cell))
+                .collect::<Vec<_>>()
+                .join(" | "),
+        );
+        output.push_str(" |\n");
+    }
+
+    output.trim_end_matches('\n').to_string()
+}
+
+fn escape_markdown_cell(value: &str) -> String {
+    value.replace('|', "\\|").replace('\n', " ")
 }
 
 fn render_mermaid_diagram(diagram: &Diagram) -> String {
@@ -1754,22 +2091,10 @@ fn render_mermaid_diagram(diagram: &Diagram) -> String {
             output.trim_end().to_owned()
         }
         Diagram::Table { headers, rows } => {
-            // Mermaid has no native table; render as a fenced markdown table inside a flowchart note
-            let mut output = String::from("flowchart LR\n");
-            let mut table = format!("| {} |\\n", headers.join(" | "));
-            table.push_str(&format!(
-                "| {} |\\n",
-                headers
-                    .iter()
-                    .map(|_| "---")
-                    .collect::<Vec<_>>()
-                    .join(" | ")
-            ));
-            for row in rows {
-                table.push_str(&format!("| {} |\\n", row.join(" | ")));
-            }
-            writeln!(&mut output, "    T[\"{}\"]", table).unwrap();
-            output.trim_end().to_owned()
+            // Mermaid has no first-class table type, so markdown callers render a
+            // real GFM table instead. Leave a minimal representation here for any
+            // future consumers that still funnel table diagrams through mermaid.
+            render_markdown_table(headers, rows)
         }
     }
 }
@@ -1802,7 +2127,7 @@ fn escape_html(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{Diagram, Document, Edge, Section, Verification};
+    use crate::model::{Diagram, Document, Edge, Section, TreeNode, Verification};
     use crate::{ExamplePreset, example_document};
 
     fn sample_document() -> Document {
@@ -1812,30 +2137,39 @@ mod tests {
                 "A short summary explains the outcome in product terms.".into(),
                 "A second paragraph adds only the necessary context.".into(),
             ],
-            sections: vec![Section {
-                title: "New flow".into(),
-                text: vec![
-                    "The UI validates first.".into(),
-                    "Only valid requests continue to the backend.".into(),
-                ],
-                diagram: Some(Diagram::Sequence {
-                    nodes: vec!["User".into(), "UI".into(), "API".into()],
-                    edges: vec![
-                        Edge {
-                            from: "User".into(),
-                            to: "UI".into(),
-                            label: Some("submit".into()),
-                        },
-                        Edge {
-                            from: "UI".into(),
-                            to: "API".into(),
-                            label: Some("valid request".into()),
-                        },
+            sections: vec![
+                Section {
+                    title: "New flow".into(),
+                    text: vec![
+                        "The UI validates first.".into(),
+                        "Only valid requests continue to the backend.".into(),
                     ],
-                }),
-                commit: None,
-                files: vec![],
-            }],
+                    diagram: Some(Diagram::Sequence {
+                        nodes: vec!["User".into(), "UI".into(), "API".into()],
+                        edges: vec![
+                            Edge {
+                                from: "User".into(),
+                                to: "UI".into(),
+                                label: Some("submit".into()),
+                            },
+                            Edge {
+                                from: "UI".into(),
+                                to: "API".into(),
+                                label: Some("valid request".into()),
+                            },
+                        ],
+                    }),
+                    commit: None,
+                    files: vec![],
+                },
+                Section {
+                    title: "Why it matters".into(),
+                    text: vec!["Errors surface immediately rather than after a round-trip.".into()],
+                    diagram: None,
+                    commit: None,
+                    files: vec![],
+                },
+            ],
             verification: Some(Verification {
                 text: vec!["An integration test and a quick manual check passed.".into()],
             }),
@@ -1883,6 +2217,379 @@ mod tests {
         assert!(!rendered.contains("data-book-track"));
         assert!(!rendered.contains("data-diagram-modal"));
         assert!(!rendered.contains("Click to enlarge"));
+    }
+
+    #[test]
+    fn table_diagram_renders_clean_markdown_table_in_mermaid_block() {
+        let document = Document {
+            title: "Table walkthrough".into(),
+            summary: vec!["Summary.".into(), "More summary.".into()],
+            sections: vec![
+                Section {
+                    title: "Permissions".into(),
+                    text: vec!["What the table shows.".into()],
+                    diagram: Some(Diagram::Table {
+                        headers: vec!["Role".into(), "Create".into(), "Delete".into()],
+                        rows: vec![
+                            vec!["admin".into(), "yes".into(), "yes".into()],
+                            vec!["user".into(), "yes".into(), "no".into()],
+                        ],
+                    }),
+                    commit: None,
+                    files: vec![],
+                },
+                Section {
+                    title: "Notes".into(),
+                    text: vec!["Why the mapping matters.".into()],
+                    diagram: None,
+                    commit: None,
+                    files: vec![],
+                },
+            ],
+            verification: None,
+            repo: None,
+        };
+
+        let rendered = render_document(&document, OutputFormat::Markdown);
+
+        assert!(
+            rendered.contains("| Role | Create | Delete |"),
+            "should emit a markdown table header row"
+        );
+        assert!(
+            rendered.contains("| --- | --- | --- |"),
+            "should emit a markdown table separator row"
+        );
+        assert!(
+            rendered.contains("| admin | yes | yes |"),
+            "should emit data rows"
+        );
+        assert!(
+            !rendered.contains("\\n"),
+            "table must not leak escaped newlines (was `{rendered}`)"
+        );
+        assert!(
+            !rendered.contains("T[\""),
+            "table must not wrap rows inside a flowchart node"
+        );
+    }
+
+    fn doc_with_diagram(title: &str, diagram: Diagram) -> Document {
+        Document {
+            title: title.into(),
+            summary: vec!["Short summary.".into()],
+            sections: vec![
+                Section {
+                    title: "Diagram section".into(),
+                    text: vec!["The diagram shows the structure.".into()],
+                    diagram: Some(diagram),
+                    commit: None,
+                    files: vec![],
+                },
+                Section {
+                    title: "Follow-up".into(),
+                    text: vec!["Why it matters.".into()],
+                    diagram: None,
+                    commit: None,
+                    files: vec![],
+                },
+            ],
+            verification: None,
+            repo: None,
+        }
+    }
+
+    #[test]
+    fn html_renders_inline_code_and_links_in_paragraphs() {
+        let doc = Document {
+            title: "Inline formatting".into(),
+            summary: vec![
+                "See the `Order` type in [the schema](https://example.com/schema) for details.".into(),
+            ],
+            sections: vec![
+                Section {
+                    title: "Request flow".into(),
+                    text: vec![
+                        "Call `validate_request(payload)` before [enqueueing](https://example.com/queue).".into(),
+                    ],
+                    diagram: None,
+                    commit: None,
+                    files: vec![],
+                },
+                Section {
+                    title: "Verification".into(),
+                    text: vec!["Tests use `assert_eq!` throughout.".into()],
+                    diagram: None,
+                    commit: None,
+                    files: vec![],
+                },
+            ],
+            verification: None,
+            repo: None,
+        };
+
+        let html = render_document(&doc, OutputFormat::Html);
+
+        assert!(
+            html.contains("<code>Order</code>"),
+            "summary inline code should become <code>"
+        );
+        assert!(
+            html.contains("<a href=\"https://example.com/schema\""),
+            "summary inline link should become <a>"
+        );
+        assert!(
+            html.contains("<code>validate_request(payload)</code>"),
+            "section inline code should become <code>"
+        );
+        assert!(
+            html.contains("<a href=\"https://example.com/queue\""),
+            "section inline link should become <a>"
+        );
+        assert!(
+            html.contains("<code>assert_eq!</code>"),
+            "later paragraphs should still get inline code rendering"
+        );
+        assert!(
+            !html.contains("`Order`") && !html.contains("`validate_request(payload)`"),
+            "raw backticks should not leak into the rendered HTML"
+        );
+    }
+
+    #[test]
+    fn html_inline_formatting_escapes_user_content() {
+        let doc = Document {
+            title: "Escaping".into(),
+            summary: vec!["Plain summary.".into()],
+            sections: vec![
+                Section {
+                    title: "Danger".into(),
+                    text: vec!["Call `<script>alert(1)</script>` for fun.".into()],
+                    diagram: None,
+                    commit: None,
+                    files: vec![],
+                },
+                Section {
+                    title: "More".into(),
+                    text: vec!["Second section.".into()],
+                    diagram: None,
+                    commit: None,
+                    files: vec![],
+                },
+            ],
+            verification: None,
+            repo: None,
+        };
+
+        let html = render_document(&doc, OutputFormat::Html);
+
+        assert!(
+            html.contains("<code>&lt;script&gt;alert(1)&lt;/script&gt;</code>"),
+            "inline code contents must be HTML-escaped"
+        );
+        assert!(
+            !html.contains("<script>alert(1)</script>"),
+            "raw script tags must never reach the output"
+        );
+    }
+
+    #[test]
+    fn markdown_passes_inline_formatting_through_unchanged() {
+        let doc = Document {
+            title: "Markdown".into(),
+            summary: vec!["Plain summary.".into()],
+            sections: vec![
+                Section {
+                    title: "Code".into(),
+                    text: vec!["Use `cargo test` often.".into()],
+                    diagram: None,
+                    commit: None,
+                    files: vec![],
+                },
+                Section {
+                    title: "Links".into(),
+                    text: vec!["See [docs](https://example.com).".into()],
+                    diagram: None,
+                    commit: None,
+                    files: vec![],
+                },
+            ],
+            verification: None,
+            repo: None,
+        };
+
+        let rendered = render_document(&doc, OutputFormat::Markdown);
+
+        assert!(rendered.contains("Use `cargo test` often."));
+        assert!(rendered.contains("See [docs](https://example.com)."));
+    }
+
+    #[test]
+    fn state_machine_svg_has_dedicated_start_marker_and_self_loop() {
+        let doc = doc_with_diagram(
+            "Dedicated state machine SVG",
+            Diagram::StateMachine {
+                states: vec!["Idle".into(), "Working".into(), "Done".into()],
+                transitions: vec![
+                    Edge {
+                        from: "Idle".into(),
+                        to: "Working".into(),
+                        label: Some("start".into()),
+                    },
+                    Edge {
+                        from: "Working".into(),
+                        to: "Working".into(),
+                        label: Some("retry".into()),
+                    },
+                    Edge {
+                        from: "Working".into(),
+                        to: "Done".into(),
+                        label: Some("finish".into()),
+                    },
+                ],
+            },
+        );
+
+        let html = render_document(&doc, OutputFormat::Html);
+
+        assert!(
+            html.contains("class=\"state-start\""),
+            "state machine SVG should include an initial-state marker"
+        );
+        assert!(
+            html.contains("class=\"self-loop\""),
+            "state machine SVG should include a dedicated self-loop path"
+        );
+        assert!(
+            html.contains("class=\"state-node\""),
+            "state machine SVG should use dedicated state-node styling instead of the generic graph node"
+        );
+    }
+
+    #[test]
+    fn state_machine_renders_in_all_three_formats() {
+        let doc = doc_with_diagram(
+            "State machine rendering",
+            Diagram::StateMachine {
+                states: vec!["Idle".into(), "Running".into(), "Done".into()],
+                transitions: vec![
+                    Edge {
+                        from: "Idle".into(),
+                        to: "Running".into(),
+                        label: Some("start".into()),
+                    },
+                    Edge {
+                        from: "Running".into(),
+                        to: "Done".into(),
+                        label: Some("finish".into()),
+                    },
+                ],
+            },
+        );
+
+        let terminal = render_document(&doc, OutputFormat::Terminal);
+        assert!(terminal.contains("State machine"));
+        assert!(terminal.contains("Idle --start--> Running"));
+        assert!(terminal.contains("Running --finish--> Done"));
+
+        let markdown = render_document(&doc, OutputFormat::Markdown);
+        assert!(markdown.contains("stateDiagram-v2"));
+        assert!(markdown.contains("Idle --> Running: start"));
+
+        let html = render_document(&doc, OutputFormat::Html);
+        assert!(html.contains("State machine"));
+        assert!(html.contains("<svg viewBox="));
+    }
+
+    #[test]
+    fn layer_stack_renders_in_all_three_formats() {
+        let doc = doc_with_diagram(
+            "Layer stack rendering",
+            Diagram::LayerStack {
+                layers: vec!["Edge".into(), "Auth".into(), "App".into(), "DB".into()],
+            },
+        );
+
+        let terminal = render_document(&doc, OutputFormat::Terminal);
+        assert!(terminal.contains("Layer stack"));
+        assert!(terminal.contains("[Edge]"));
+        assert!(terminal.contains("[DB]"));
+
+        let markdown = render_document(&doc, OutputFormat::Markdown);
+        assert!(markdown.contains("block-beta"));
+        assert!(markdown.contains("L0[\"Edge\"]"));
+        assert!(markdown.contains("L3[\"DB\"]"));
+
+        let html = render_document(&doc, OutputFormat::Html);
+        assert!(html.contains("Layer stack"));
+        assert!(html.contains("<svg viewBox="));
+    }
+
+    #[test]
+    fn table_diagram_renders_in_all_three_formats() {
+        let doc = doc_with_diagram(
+            "Table rendering",
+            Diagram::Table {
+                headers: vec!["Role".into(), "Read".into(), "Write".into()],
+                rows: vec![
+                    vec!["admin".into(), "yes".into(), "yes".into()],
+                    vec!["viewer".into(), "yes".into(), "no".into()],
+                ],
+            },
+        );
+
+        let terminal = render_document(&doc, OutputFormat::Terminal);
+        assert!(terminal.contains("Role"));
+        assert!(terminal.contains("admin"));
+        assert!(terminal.contains("-+-"));
+
+        let markdown = render_document(&doc, OutputFormat::Markdown);
+        assert!(markdown.contains("| Role | Read | Write |"));
+        assert!(markdown.contains("| --- | --- | --- |"));
+        assert!(markdown.contains("| admin | yes | yes |"));
+
+        let html = render_document(&doc, OutputFormat::Html);
+        assert!(html.contains("Table"));
+        assert!(html.contains("<svg viewBox="));
+    }
+
+    #[test]
+    fn dependency_tree_renders_in_all_three_formats() {
+        let doc = doc_with_diagram(
+            "Dependency tree rendering",
+            Diagram::DependencyTree {
+                root: "service".into(),
+                children: vec![
+                    TreeNode {
+                        label: "api".into(),
+                        children: vec![TreeNode {
+                            label: "routes".into(),
+                            children: vec![],
+                        }],
+                    },
+                    TreeNode {
+                        label: "worker".into(),
+                        children: vec![],
+                    },
+                ],
+            },
+        );
+
+        let terminal = render_document(&doc, OutputFormat::Terminal);
+        assert!(terminal.contains("service"));
+        assert!(terminal.contains("├── api"));
+        assert!(terminal.contains("└── worker"));
+        assert!(terminal.contains("└── routes"));
+
+        let markdown = render_document(&doc, OutputFormat::Markdown);
+        assert!(markdown.contains("flowchart TD"));
+        assert!(markdown.contains("ROOT[\"service\"]"));
+        assert!(markdown.contains("[\"api\"]"));
+        assert!(markdown.contains("[\"routes\"]"));
+
+        let html = render_document(&doc, OutputFormat::Html);
+        assert!(html.contains("Dependency tree"));
+        assert!(html.contains("<svg viewBox="));
     }
 
     #[test]

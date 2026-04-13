@@ -88,6 +88,7 @@ Starter presets:
   timeline      Ordered sequence when implementation order matters
   before_after  Behavior comparison when the change is best shown side by side
   followup      Narrower follow-up explainer that answers one focused implementation question
+  handoff       Handoff explainer with timeline, component graph, and verification steps
 
 Checked-in realistic references:
   examples/session-walkthrough.json
@@ -258,6 +259,7 @@ enum CliExamplePreset {
     Timeline,
     BeforeAfter,
     Followup,
+    Handoff,
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
@@ -307,6 +309,7 @@ impl From<CliExamplePreset> for ExamplePreset {
             CliExamplePreset::Timeline => ExamplePreset::Timeline,
             CliExamplePreset::BeforeAfter => ExamplePreset::BeforeAfter,
             CliExamplePreset::Followup => ExamplePreset::Followup,
+            CliExamplePreset::Handoff => ExamplePreset::Handoff,
         }
     }
 }
@@ -337,7 +340,6 @@ fn main() -> Result<()> {
             render_format,
             focus,
         } => {
-            let _render_format = render_format;
             let options = PromptOptions {
                 agent_type,
                 source,
@@ -346,6 +348,7 @@ fn main() -> Result<()> {
                 question: question.as_deref(),
                 scope: &scope,
                 artifact: artifact.as_path(),
+                render_format,
                 focus: &focus,
             };
             println!("{}", prompt_text(options));
@@ -442,6 +445,7 @@ struct PromptOptions<'a> {
     question: Option<&'a str>,
     scope: &'a [String],
     artifact: &'a Path,
+    render_format: CliOutputFormat,
     focus: &'a [CliPromptFocus],
 }
 
@@ -462,7 +466,8 @@ fn prompt_text(options: PromptOptions<'_>) -> String {
     let scope_guidance = prompt_scope_guidance(options.scope);
     let diagram_guidance = prompt_diagram_guidance(options.goal, options.focus);
 
-    let go_command = format!("magellan go --input {}", options.artifact.display());
+    let (render_step, render_target_line) =
+        prompt_render_step(options.render_format, options.artifact);
 
     format!(
         "You are {agent_name}. Use Magellan to produce a compact walkthrough focused on this topic: {effective_topic}
@@ -479,8 +484,7 @@ Workflow:
    - short `text` arrays instead of long prose
    - optional `diagram` objects when they clarify the technical flow
    - optional `verification`
-5. Run `{go_command}`.
-   This validates, renders HTML (opens it in the browser), and writes markdown.
+5. {render_step}
    Do not skip this step. The rendered artifacts are the deliverable, not a prose summary.
 
 Content rules:
@@ -509,10 +513,11 @@ Focus for this walkthrough:
 {focus_guidance}
 
 Required final step:
-`{go_command}`",
+`{render_target_line}`",
         effective_topic = effective_topic,
         artifact = options.artifact.display(),
-        go_command = go_command,
+        render_step = render_step,
+        render_target_line = render_target_line,
         source_guidance = source_guidance,
         section_guidance = section_guidance,
         goal_guidance = goal_guidance,
@@ -521,6 +526,43 @@ Required final step:
         focus_guidance = focus_guidance,
         diagram_guidance = diagram_guidance
     )
+}
+
+fn prompt_render_step(format: CliOutputFormat, artifact: &Path) -> (String, String) {
+    let artifact_display = artifact.display().to_string();
+    match format {
+        CliOutputFormat::Html => {
+            let command = format!("magellan go --input {artifact_display}");
+            let step = format!(
+                "Run `{command}`.\n   This validates, renders HTML (opens it in the browser), and writes markdown."
+            );
+            (step, command)
+        }
+        CliOutputFormat::Markdown => {
+            let markdown_path = artifact_with_extension(artifact, "md");
+            let command = format!(
+                "magellan render --input {artifact_display} --format markdown --out {markdown_path}"
+            );
+            let step = format!(
+                "Run `{command}`.\n   This validates the payload and writes a markdown file for sharing, docs, or PR comments."
+            );
+            (step, command)
+        }
+        CliOutputFormat::Terminal => {
+            let command = format!("magellan render --input {artifact_display} --format terminal");
+            let step = format!(
+                "Run `{command}`.\n   This validates the payload and prints the terminal-friendly walkthrough."
+            );
+            (step, command)
+        }
+    }
+}
+
+fn artifact_with_extension(artifact: &Path, extension: &str) -> String {
+    if artifact == Path::new("-") {
+        return format!("-.{extension}");
+    }
+    artifact.with_extension(extension).display().to_string()
 }
 
 fn resolve_render_destination(

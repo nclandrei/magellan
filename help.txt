@@ -16,7 +16,7 @@ Usage:
   magellan go --input <payload.json|-> [--out <path>] [--markdown-out <path>]
   magellan schema
   magellan prompt --agent-type <codex|claude> [--source <session|diff|branch|pr>] [--goal <walkthrough|followup|handoff>] [options]
-  magellan example --preset <walkthrough|timeline|before-after|followup>
+  magellan example --preset <walkthrough|timeline|before-after|followup|handoff>
   magellan validate --input <payload.json|->
   magellan render --input <payload.json|-> --format <terminal|markdown|html> [--out <path>] [--open]
   magellan guide
@@ -85,8 +85,9 @@ Session evidence:
 
 Content rules:
   - Keep the summary to 1-2 short paragraphs.
-  - Keep sections to 3-6 focused chunks.
+  - Keep sections to 2-6 focused chunks.
   - Keep section text short.
+  - Inline `backticks` become <code> in HTML, and `[label](https://...)` links become <a> tags. Markdown passes both through unchanged.
   - In HTML, each section becomes a scrollable block with a sidebar table of contents.
   - Diagrams render inline with SVG and an ASCII fallback.
   - Use diagrams only when they make the technical explanation easier to follow.
@@ -153,6 +154,7 @@ Fast paths:
   Start from a built-in preset:
   - `magellan example --preset timeline`
   - `magellan example --preset followup`
+  - `magellan example --preset handoff`
 
   Study a realistic HTML report:
   - `magellan render --input examples/session-walkthrough.json --format html --open`

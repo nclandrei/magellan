@@ -27,8 +27,8 @@ Magellan is a deterministic presentation engine. It does not inspect a repositor
 - Explain behavior and flow, not file churn.
 - Keep `--help` outputs instructional for agents: each command should teach the workflow, not only list flags.
 - Keep `help.txt` aligned with the real CLI. Top-level `magellan --help` should print that checked-in file directly, Showboat-style. `magellan guide` is only an explicit alias.
-- Remember that HTML now defaults to book view: one summary page, then one page per section, with an overview toggle in the same report.
-- Book-mode diagrams are expandable, so they should stay technically dense enough to merit the larger modal view.
+- Remember that HTML renders a self-contained sidebar-scroll layout: a sticky table of contents on the left, continuous scroll on the right, and a light/dark theme toggle.
+- Inline SVG diagrams open in a lightbox on click, so they should stay technically dense enough to merit the larger modal view.
 - Keep package metadata and release workflows aligned. The crates.io package name is `magellan-cli`, but the installed binary and Homebrew formula stay `magellan`.
 - Add tests whenever changing schema rules, CLI behavior, or renderers.
 
@@ -52,15 +52,16 @@ cargo run -- prompt --agent-type codex --source session --goal walkthrough
 cargo run -- prompt --agent-type codex --source diff --goal followup --question "why did this flow change?"
 cargo run -- prompt --agent-type claude --source branch --goal handoff --scope backend --scope tests --artifact /tmp/handoff.json
 cargo run -- example --preset walkthrough
+cargo run -- example --preset walkthrough > /tmp/magellan.json
+cargo run -- go --input /tmp/magellan.json
 cargo run -- validate --input examples/session-walkthrough.json
 cargo run -- render --input examples/branch-handoff-timeline.json --format markdown
 cargo run -- render --input examples/followup-validation-question.json --format html --out /tmp/magellan-question.html
-cargo run -- validate --input payload.json
-cargo run -- render --input payload.json --format terminal
-cargo run -- render --input payload.json --format markdown
-cargo run -- render --input payload.json --format html --out /tmp/magellan.html
-cargo run -- render --input payload.json --format html --open
 ```
+
+`go` is the primary feedback loop — it validates, renders HTML, opens it, and
+writes markdown in one step. Reach for `validate` and `render` only when you
+need to inspect a single format in isolation.
 
 Use `--input -` when piping JSON from another tool or agent.
 

@@ -15,7 +15,7 @@ fn fixture_path(relative: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join(relative)
 }
 
-fn fixture_cases() -> [FixtureCase; 3] {
+fn fixture_cases() -> [FixtureCase; 7] {
     [
         FixtureCase {
             path: "examples/session-walkthrough.json",
@@ -84,6 +84,71 @@ fn fixture_cases() -> [FixtureCase; 3] {
                 "class=\"toc-link",
                 "Flow diagram",
                 "Before / after",
+                "ASCII fallback",
+            ],
+        },
+        FixtureCase {
+            path: "examples/state-machine-order-lifecycle.json",
+            title: "State machine: order lifecycle after the refund refactor",
+            terminal_markers: &[
+                "Order lifecycle states",
+                "State machine",
+                "Pending --place order--> Paid",
+            ],
+            markdown_markers: &[
+                "## Order lifecycle states",
+                "stateDiagram-v2",
+                "Pending --> Paid: place order",
+            ],
+            html_markers: &[
+                "Magellan walkthrough",
+                "class=\"sidebar\"",
+                "State machine",
+                "ASCII fallback",
+            ],
+        },
+        FixtureCase {
+            path: "examples/layer-stack-request-pipeline.json",
+            title: "Layer stack: inbound request pipeline",
+            terminal_markers: &["Layer stack", "[Edge CDN]", "[Load Balancer]"],
+            markdown_markers: &["## Pipeline layers", "block-beta"],
+            html_markers: &[
+                "Magellan walkthrough",
+                "class=\"sidebar\"",
+                "Layer stack",
+                "ASCII fallback",
+            ],
+        },
+        FixtureCase {
+            path: "examples/table-permission-matrix.json",
+            title: "Table: permission matrix after the role rewrite",
+            terminal_markers: &["Role", "admin", "viewer"],
+            markdown_markers: &[
+                "## Permission matrix",
+                "| Role | Create | Delete | Invite |",
+                "| --- | --- | --- | --- |",
+                "| admin | yes | yes | yes |",
+            ],
+            html_markers: &[
+                "Magellan walkthrough",
+                "class=\"sidebar\"",
+                "Table",
+                "ASCII fallback",
+            ],
+        },
+        FixtureCase {
+            path: "examples/dependency-tree-service-modules.json",
+            title: "Dependency tree: payment service module layout",
+            terminal_markers: &["payment_service", "├──", "└──"],
+            markdown_markers: &[
+                "## Service module layout",
+                "flowchart TD",
+                "ROOT[\"payment_service\"]",
+            ],
+            html_markers: &[
+                "Magellan walkthrough",
+                "class=\"sidebar\"",
+                "Dependency tree",
                 "ASCII fallback",
             ],
         },

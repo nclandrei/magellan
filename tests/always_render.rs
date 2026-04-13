@@ -471,6 +471,70 @@ fn render_markdown_out_writes_alongside_html() {
 }
 
 // ---------------------------------------------------------------------------
+// Docs stay in sync with the real renderer
+// ---------------------------------------------------------------------------
+
+#[test]
+fn readme_does_not_advertise_book_view() {
+    let readme = fs::read_to_string("README.md").expect("README.md should be readable");
+    let lower = readme.to_lowercase();
+
+    assert!(
+        !lower.contains("book view"),
+        "README.md must not advertise the removed book view"
+    );
+    assert!(
+        readme.contains("sidebar"),
+        "README.md should describe the current sidebar HTML layout"
+    );
+}
+
+#[test]
+fn readme_documents_the_mandatory_go_command() {
+    let readme = fs::read_to_string("README.md").expect("README.md should be readable");
+
+    assert!(
+        readme.contains("magellan go"),
+        "README.md must document the `magellan go` command"
+    );
+    assert!(
+        readme.contains("go        Validate, render HTML, open it, and write markdown"),
+        "README.md command list should describe what `go` does"
+    );
+    assert!(
+        readme.contains("magellan go --input /tmp/magellan.json"),
+        "README.md should include a concrete `magellan go` invocation example"
+    );
+}
+
+#[test]
+fn agent_docs_mention_go_in_development_commands() {
+    for path in ["CLAUDE.md", "AGENTS.md"] {
+        let contents =
+            fs::read_to_string(path).unwrap_or_else(|_| panic!("{path} should be readable"));
+
+        assert!(
+            contents.contains("cargo run -- go --input"),
+            "{path} Development Commands should teach the `go` feedback loop"
+        );
+    }
+}
+
+#[test]
+fn agent_docs_do_not_contradict_renderer_with_book_view() {
+    for path in ["CLAUDE.md", "AGENTS.md"] {
+        let contents =
+            fs::read_to_string(path).unwrap_or_else(|_| panic!("{path} should be readable"));
+        let lower = contents.to_lowercase();
+
+        assert!(
+            !lower.contains("book view") && !lower.contains("book-mode"),
+            "{path} must not reference the removed book view / book mode"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -495,6 +559,12 @@ fn sample_payload() -> &'static str {
           { "from": "Form", "to": "API", "label": "valid request" }
         ]
       }
+    },
+    {
+      "title": "Why it matters",
+      "text": [
+        "Feedback arrives before a round-trip, so broken submissions never reach the backend."
+      ]
     }
   ],
   "verification": {

@@ -1,0 +1,37 @@
+{
+  "title": "Table: permission matrix after the role rewrite",
+  "summary": [
+    "The role rewrite collapses five overlapping legacy roles into a small permission matrix so every capability maps to exactly one role.",
+    "The table is the source of truth for what each role can do and mirrors the enum used in the codebase."
+  ],
+  "sections": [
+    {
+      "title": "Permission matrix",
+      "text": [
+        "Admins can do everything. Editors can create and invite but cannot delete. Viewers are read-only.",
+        "Any capability not listed here is implicitly denied for every role."
+      ],
+      "diagram": {
+        "type": "table",
+        "headers": ["Role", "Create", "Delete", "Invite"],
+        "rows": [
+          ["admin", "yes", "yes", "yes"],
+          ["editor", "yes", "no", "yes"],
+          ["viewer", "no", "no", "no"]
+        ]
+      }
+    },
+    {
+      "title": "How the matrix is enforced",
+      "text": [
+        "The authorization middleware loads the role for the caller and rejects any capability that is not marked yes in this table.",
+        "The table is generated from the same enum, so drift between docs and enforcement cannot happen."
+      ]
+    }
+  ],
+  "verification": {
+    "text": [
+      "Unit tests exercise every role-capability pair and assert against this matrix directly."
+    ]
+  }
+}
