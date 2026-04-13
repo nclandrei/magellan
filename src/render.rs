@@ -814,7 +814,7 @@ fn render_svg_diagram(index: usize, diagram: &Diagram) -> String {
         Diagram::StateMachine {
             states,
             transitions,
-        } => render_graph_svg(&diagram_id, "State machine", states, transitions),
+        } => render_state_machine_svg(&diagram_id, states, transitions),
         Diagram::Table { headers, rows } => render_table_svg(&diagram_id, headers, rows),
         Diagram::DependencyTree { root, children } => {
             render_dependency_tree_svg(&diagram_id, root, children)
@@ -1153,6 +1153,160 @@ fn render_layer_stack_svg(id: &str, layers: &[String]) -> String {
     svg_shell(id, width, height.max(120), &marker_id, "Layer stack", &body)
 }
 
+fn render_state_machine_svg(id: &str, states: &[String], transitions: &[Edge]) -> String {
+    let ordered = ordered_nodes(states, transitions);
+    let wrapped_states = ordered
+        .iter()
+        .map(|state| wrap_text(state, 16))
+        .collect::<Vec<_>>();
+
+    let columns = ordered.len().clamp(1, 3);
+    let rows = ordered.len().div_ceil(columns).max(1);
+    let box_width = wrapped_states
+        .iter()
+        .flat_map(|lines| lines.iter())
+        .map(|line| estimate_text_width(line, 124, 200))
+        .max()
+        .unwrap_or(124);
+    let box_height = wrapped_states
+        .iter()
+        .map(|lines| 28 + (lines.len() as i32 * 16))
+        .max()
+        .unwrap_or(60);
+
+    let padding = 36;
+    let gap_x = 64;
+    let gap_y = 82;
+    // Extra left padding so the start marker fits in front of the first state.
+    let left_inset = 28;
+
+    let width = padding * 2
+        + left_inset
+        + columns as i32 * box_width
+        + (columns.saturating_sub(1)) as i32 * gap_x;
+    let height = padding * 2 + rows as i32 * box_height + (rows.saturating_sub(1)) as i32 * gap_y;
+    let marker_id = format!("{id}-arrow");
+
+    let positions = ordered
+        .iter()
+        .enumerate()
+        .map(|(index, state)| {
+            let row = index / columns;
+            let col = index % columns;
+            let x = padding + left_inset + col as i32 * (box_width + gap_x);
+            let y = padding + row as i32 * (box_height + gap_y);
+            (state.as_str(), (x, y))
+        })
+        .collect::<Vec<_>>();
+
+    let mut body = String::new();
+
+    // Start marker: a small filled circle connected to the first state.
+    if let Some((_, (first_x, first_y))) = positions.first() {
+        let cx = first_x - 18;
+        let cy = first_y + box_height / 2;
+        write!(
+            &mut body,
+            "<circle class=\"state-start\" cx=\"{cx}\" cy=\"{cy}\" r=\"5\"/>"
+        )
+        .unwrap();
+        write!(
+            &mut body,
+            "<line class=\"connector\" x1=\"{}\" y1=\"{cy}\" x2=\"{}\" y2=\"{cy}\" marker-end=\"url(#{marker_id})\"/>",
+            cx + 5,
+            first_x
+        )
+        .unwrap();
+    }
+
+    for edge in transitions {
+        let Some((from_x, from_y)) = positions
+            .iter()
+            .find(|(node, _)| *node == edge.from.as_str())
+            .map(|(_, position)| *position)
+        else {
+            continue;
+        };
+
+        if edge.from == edge.to {
+            // Self-loop: draw a small arc above the state box.
+            let center_x = from_x + box_width / 2;
+            let top_y = from_y;
+            let loop_radius = 18;
+            let loop_left = center_x - loop_radius;
+            let loop_right = center_x + loop_radius;
+            let loop_top = top_y - 26;
+            write!(
+                &mut body,
+                "<path class=\"self-loop\" d=\"M {loop_left} {top_y} C {loop_left} {loop_top}, {loop_right} {loop_top}, {loop_right} {top_y}\" fill=\"none\" marker-end=\"url(#{marker_id})\"/>"
+            )
+            .unwrap();
+
+            if let Some(label) = &edge.label {
+                write_multiline_svg_text(
+                    &mut body,
+                    center_x,
+                    loop_top - 2,
+                    &wrap_text(label, 14),
+                    "middle",
+                    "edge-copy",
+                );
+            }
+            continue;
+        }
+
+        let Some((to_x, to_y)) = positions
+            .iter()
+            .find(|(node, _)| *node == edge.to.as_str())
+            .map(|(_, position)| *position)
+        else {
+            continue;
+        };
+
+        let start_x = from_x + box_width / 2;
+        let start_y = from_y + box_height / 2;
+        let end_x = to_x + box_width / 2;
+        let end_y = to_y + box_height / 2;
+
+        write!(
+            &mut body,
+            "<line class=\"connector\" x1=\"{start_x}\" y1=\"{start_y}\" x2=\"{end_x}\" y2=\"{end_y}\" marker-end=\"url(#{marker_id})\"/>"
+        )
+        .unwrap();
+
+        if let Some(label) = &edge.label {
+            write_multiline_svg_text(
+                &mut body,
+                (start_x + end_x) / 2,
+                (start_y + end_y) / 2 - 8,
+                &wrap_text(label, 14),
+                "middle",
+                "edge-copy",
+            );
+        }
+    }
+
+    for ((_, (x, y)), lines) in positions.iter().zip(wrapped_states.iter()) {
+        let center_x = *x + box_width / 2;
+        write!(
+            &mut body,
+            "<rect class=\"state-node\" x=\"{}\" y=\"{}\" width=\"{box_width}\" height=\"{box_height}\" rx=\"22\" ry=\"22\"/>",
+            x, y
+        )
+        .unwrap();
+        write_multiline_svg_text(&mut body, center_x, *y + 28, lines, "middle", "node-copy");
+    }
+
+    svg_shell(
+        id,
+        width.max(360),
+        height.max(200),
+        &marker_id,
+        "State machine",
+        &body,
+    )
+}
+
 fn render_dependency_tree_svg(id: &str, root: &str, children: &[TreeNode]) -> String {
     let padding = 24;
     let row_height = 32;
@@ -1332,6 +1486,21 @@ fn svg_shell(
       fill: var(--diagram-node-fill, #1b1a18);
       stroke: var(--diagram-stroke, rgba(160, 152, 144, 0.4));
       stroke-width: 1;
+    }}
+    .state-node {{
+      fill: var(--diagram-node-fill, #1b1a18);
+      stroke: var(--diagram-stroke, rgba(160, 152, 144, 0.55));
+      stroke-width: 1.5;
+    }}
+    .state-start {{
+      fill: var(--diagram-dot, rgba(160, 152, 144, 0.85));
+      stroke: var(--diagram-dot-ring, rgba(160, 152, 144, 0.2));
+      stroke-width: 2;
+    }}
+    .self-loop {{
+      stroke: var(--diagram-stroke, rgba(160, 152, 144, 0.6));
+      stroke-width: 1.5;
+      fill: none;
     }}
     .lane {{
       stroke: var(--diagram-lane, rgba(255, 255, 255, 0.12));
@@ -2253,6 +2422,48 @@ mod tests {
 
         assert!(rendered.contains("Use `cargo test` often."));
         assert!(rendered.contains("See [docs](https://example.com)."));
+    }
+
+    #[test]
+    fn state_machine_svg_has_dedicated_start_marker_and_self_loop() {
+        let doc = doc_with_diagram(
+            "Dedicated state machine SVG",
+            Diagram::StateMachine {
+                states: vec!["Idle".into(), "Working".into(), "Done".into()],
+                transitions: vec![
+                    Edge {
+                        from: "Idle".into(),
+                        to: "Working".into(),
+                        label: Some("start".into()),
+                    },
+                    Edge {
+                        from: "Working".into(),
+                        to: "Working".into(),
+                        label: Some("retry".into()),
+                    },
+                    Edge {
+                        from: "Working".into(),
+                        to: "Done".into(),
+                        label: Some("finish".into()),
+                    },
+                ],
+            },
+        );
+
+        let html = render_document(&doc, OutputFormat::Html);
+
+        assert!(
+            html.contains("class=\"state-start\""),
+            "state machine SVG should include an initial-state marker"
+        );
+        assert!(
+            html.contains("class=\"self-loop\""),
+            "state machine SVG should include a dedicated self-loop path"
+        );
+        assert!(
+            html.contains("class=\"state-node\""),
+            "state machine SVG should use dedicated state-node styling instead of the generic graph node"
+        );
     }
 
     #[test]
