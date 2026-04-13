@@ -112,10 +112,18 @@ fn render_markdown(document: &Document) -> String {
         }
 
         if let Some(diagram) = &section.diagram {
-            writeln!(&mut output, "```mermaid").unwrap();
-            writeln!(&mut output, "{}", render_mermaid_diagram(diagram)).unwrap();
-            writeln!(&mut output, "```").unwrap();
-            writeln!(&mut output).unwrap();
+            match diagram {
+                Diagram::Table { headers, rows } => {
+                    writeln!(&mut output, "{}", render_markdown_table(headers, rows)).unwrap();
+                    writeln!(&mut output).unwrap();
+                }
+                _ => {
+                    writeln!(&mut output, "```mermaid").unwrap();
+                    writeln!(&mut output, "{}", render_mermaid_diagram(diagram)).unwrap();
+                    writeln!(&mut output, "```").unwrap();
+                    writeln!(&mut output).unwrap();
+                }
+            }
         }
     }
 
@@ -1616,6 +1624,46 @@ fn render_ascii_edges(title: &str, edges: &[Edge]) -> String {
     output.trim_end().to_owned()
 }
 
+fn render_markdown_table(headers: &[String], rows: &[Vec<String>]) -> String {
+    let mut output = String::new();
+    output.push_str("| ");
+    output.push_str(
+        &headers
+            .iter()
+            .map(|header| escape_markdown_cell(header))
+            .collect::<Vec<_>>()
+            .join(" | "),
+    );
+    output.push_str(" |\n");
+
+    output.push_str("| ");
+    output.push_str(
+        &headers
+            .iter()
+            .map(|_| "---".to_string())
+            .collect::<Vec<_>>()
+            .join(" | "),
+    );
+    output.push_str(" |\n");
+
+    for row in rows {
+        output.push_str("| ");
+        output.push_str(
+            &row.iter()
+                .map(|cell| escape_markdown_cell(cell))
+                .collect::<Vec<_>>()
+                .join(" | "),
+        );
+        output.push_str(" |\n");
+    }
+
+    output.trim_end_matches('\n').to_string()
+}
+
+fn escape_markdown_cell(value: &str) -> String {
+    value.replace('|', "\\|").replace('\n', " ")
+}
+
 fn render_mermaid_diagram(diagram: &Diagram) -> String {
     match diagram {
         Diagram::Sequence { edges, .. } => {
@@ -1754,22 +1802,10 @@ fn render_mermaid_diagram(diagram: &Diagram) -> String {
             output.trim_end().to_owned()
         }
         Diagram::Table { headers, rows } => {
-            // Mermaid has no native table; render as a fenced markdown table inside a flowchart note
-            let mut output = String::from("flowchart LR\n");
-            let mut table = format!("| {} |\\n", headers.join(" | "));
-            table.push_str(&format!(
-                "| {} |\\n",
-                headers
-                    .iter()
-                    .map(|_| "---")
-                    .collect::<Vec<_>>()
-                    .join(" | ")
-            ));
-            for row in rows {
-                table.push_str(&format!("| {} |\\n", row.join(" | ")));
-            }
-            writeln!(&mut output, "    T[\"{}\"]", table).unwrap();
-            output.trim_end().to_owned()
+            // Mermaid has no first-class table type, so markdown callers render a
+            // real GFM table instead. Leave a minimal representation here for any
+            // future consumers that still funnel table diagrams through mermaid.
+            render_markdown_table(headers, rows)
         }
     }
 }
@@ -1883,6 +1919,61 @@ mod tests {
         assert!(!rendered.contains("data-book-track"));
         assert!(!rendered.contains("data-diagram-modal"));
         assert!(!rendered.contains("Click to enlarge"));
+    }
+
+    #[test]
+    fn table_diagram_renders_clean_markdown_table_in_mermaid_block() {
+        let document = Document {
+            title: "Table walkthrough".into(),
+            summary: vec!["Summary.".into(), "More summary.".into()],
+            sections: vec![
+                Section {
+                    title: "Permissions".into(),
+                    text: vec!["What the table shows.".into()],
+                    diagram: Some(Diagram::Table {
+                        headers: vec!["Role".into(), "Create".into(), "Delete".into()],
+                        rows: vec![
+                            vec!["admin".into(), "yes".into(), "yes".into()],
+                            vec!["user".into(), "yes".into(), "no".into()],
+                        ],
+                    }),
+                    commit: None,
+                    files: vec![],
+                },
+                Section {
+                    title: "Notes".into(),
+                    text: vec!["Why the mapping matters.".into()],
+                    diagram: None,
+                    commit: None,
+                    files: vec![],
+                },
+            ],
+            verification: None,
+            repo: None,
+        };
+
+        let rendered = render_document(&document, OutputFormat::Markdown);
+
+        assert!(
+            rendered.contains("| Role | Create | Delete |"),
+            "should emit a markdown table header row"
+        );
+        assert!(
+            rendered.contains("| --- | --- | --- |"),
+            "should emit a markdown table separator row"
+        );
+        assert!(
+            rendered.contains("| admin | yes | yes |"),
+            "should emit data rows"
+        );
+        assert!(
+            !rendered.contains("\\n"),
+            "table must not leak escaped newlines (was `{rendered}`)"
+        );
+        assert!(
+            !rendered.contains("T[\""),
+            "table must not wrap rows inside a flowchart node"
+        );
     }
 
     #[test]
