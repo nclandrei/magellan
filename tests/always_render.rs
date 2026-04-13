@@ -508,6 +508,19 @@ fn readme_documents_the_mandatory_go_command() {
 }
 
 #[test]
+fn agent_docs_mention_go_in_development_commands() {
+    for path in ["CLAUDE.md", "AGENTS.md"] {
+        let contents = fs::read_to_string(path)
+            .unwrap_or_else(|_| panic!("{path} should be readable"));
+
+        assert!(
+            contents.contains("cargo run -- go --input"),
+            "{path} Development Commands should teach the `go` feedback loop"
+        );
+    }
+}
+
+#[test]
 fn agent_docs_do_not_contradict_renderer_with_book_view() {
     for path in ["CLAUDE.md", "AGENTS.md"] {
         let contents = fs::read_to_string(path)

@@ -52,15 +52,16 @@ cargo run -- prompt --agent-type codex --source session --goal walkthrough
 cargo run -- prompt --agent-type codex --source diff --goal followup --question "why did this flow change?"
 cargo run -- prompt --agent-type claude --source branch --goal handoff --scope backend --scope tests --artifact /tmp/handoff.json
 cargo run -- example --preset walkthrough
+cargo run -- example --preset walkthrough > /tmp/magellan.json
+cargo run -- go --input /tmp/magellan.json
 cargo run -- validate --input examples/session-walkthrough.json
 cargo run -- render --input examples/branch-handoff-timeline.json --format markdown
 cargo run -- render --input examples/followup-validation-question.json --format html --out /tmp/magellan-question.html
-cargo run -- validate --input payload.json
-cargo run -- render --input payload.json --format terminal
-cargo run -- render --input payload.json --format markdown
-cargo run -- render --input payload.json --format html --out /tmp/magellan.html
-cargo run -- render --input payload.json --format html --open
 ```
+
+`go` is the primary feedback loop — it validates, renders HTML, opens it, and
+writes markdown in one step. Reach for `validate` and `render` only when you
+need to inspect a single format in isolation.
 
 Use `--input -` when piping JSON from another tool or agent.
 
