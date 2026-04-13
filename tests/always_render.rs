@@ -510,8 +510,8 @@ fn readme_documents_the_mandatory_go_command() {
 #[test]
 fn agent_docs_mention_go_in_development_commands() {
     for path in ["CLAUDE.md", "AGENTS.md"] {
-        let contents = fs::read_to_string(path)
-            .unwrap_or_else(|_| panic!("{path} should be readable"));
+        let contents =
+            fs::read_to_string(path).unwrap_or_else(|_| panic!("{path} should be readable"));
 
         assert!(
             contents.contains("cargo run -- go --input"),
@@ -523,8 +523,8 @@ fn agent_docs_mention_go_in_development_commands() {
 #[test]
 fn agent_docs_do_not_contradict_renderer_with_book_view() {
     for path in ["CLAUDE.md", "AGENTS.md"] {
-        let contents = fs::read_to_string(path)
-            .unwrap_or_else(|_| panic!("{path} should be readable"));
+        let contents =
+            fs::read_to_string(path).unwrap_or_else(|_| panic!("{path} should be readable"));
         let lower = contents.to_lowercase();
 
         assert!(

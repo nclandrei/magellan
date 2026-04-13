@@ -80,7 +80,7 @@ Usage:
   magellan go --input <payload.json|-> [--out <path>] [--markdown-out <path>]
   magellan schema
   magellan prompt --agent-type <codex|claude> [--source <session|diff|branch|pr>] [--goal <walkthrough|followup|handoff>] [options]
-  magellan example --preset <walkthrough|timeline|before-after|followup>
+  magellan example --preset <walkthrough|timeline|before-after|followup|handoff>
   magellan validate --input <payload.json|->
   magellan render --input <payload.json|-> --format <terminal|markdown|html> [--out <path>] [--open]
   magellan guide

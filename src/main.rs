@@ -88,6 +88,7 @@ Starter presets:
   timeline      Ordered sequence when implementation order matters
   before_after  Behavior comparison when the change is best shown side by side
   followup      Narrower follow-up explainer that answers one focused implementation question
+  handoff       Handoff explainer with timeline, component graph, and verification steps
 
 Checked-in realistic references:
   examples/session-walkthrough.json
@@ -258,6 +259,7 @@ enum CliExamplePreset {
     Timeline,
     BeforeAfter,
     Followup,
+    Handoff,
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
@@ -307,6 +309,7 @@ impl From<CliExamplePreset> for ExamplePreset {
             CliExamplePreset::Timeline => ExamplePreset::Timeline,
             CliExamplePreset::BeforeAfter => ExamplePreset::BeforeAfter,
             CliExamplePreset::Followup => ExamplePreset::Followup,
+            CliExamplePreset::Handoff => ExamplePreset::Handoff,
         }
     }
 }

@@ -8,6 +8,7 @@ pub enum ExamplePreset {
     Timeline,
     BeforeAfter,
     Followup,
+    Handoff,
 }
 
 pub fn example_document(preset: ExamplePreset) -> Document {
@@ -16,6 +17,7 @@ pub fn example_document(preset: ExamplePreset) -> Document {
         ExamplePreset::Timeline => timeline_example(),
         ExamplePreset::BeforeAfter => before_after_example(),
         ExamplePreset::Followup => followup_example(),
+        ExamplePreset::Handoff => handoff_example(),
     }
 }
 
@@ -262,6 +264,100 @@ fn followup_example() -> Document {
     }
 }
 
+fn handoff_example() -> Document {
+    Document {
+        title: "Handoff: payments webhook retry boundary".into(),
+        summary: vec![
+            "Another engineer is picking up the payments webhook retry work midway through implementation.".into(),
+            "This handoff walks through what already landed, the retry boundary decision, and the verification that still needs to happen.".into(),
+        ],
+        sections: vec![
+            Section {
+                title: "What has already landed".into(),
+                text: vec![
+                    "The webhook ingestion path now enqueues jobs immediately and the background worker owns the retry decision.".into(),
+                    "Attempt counts and backoff timestamps are persisted on the queue record rather than reconstructed in the handler.".into(),
+                ],
+                diagram: Some(Diagram::Timeline {
+                    events: vec![
+                        TimelineEvent {
+                            label: "Step 1".into(),
+                            detail: "Move retry state onto the queue record schema.".into(),
+                        },
+                        TimelineEvent {
+                            label: "Step 2".into(),
+                            detail: "Move the retry guard into the background worker.".into(),
+                        },
+                        TimelineEvent {
+                            label: "Step 3".into(),
+                            detail: "Drop the retry checks that used to live in the API handler.".into(),
+                        },
+                    ],
+                }),
+                commit: None,
+                files: vec![],
+            },
+            Section {
+                title: "Retry boundary decision".into(),
+                text: vec![
+                    "The worker owns the retry decision because it already has attempt metadata and backoff state in memory.".into(),
+                    "This keeps the API handler lightweight and avoids re-deriving retry state from partial request context.".into(),
+                ],
+                diagram: Some(Diagram::ComponentGraph {
+                    nodes: vec![
+                        "Webhook Handler".into(),
+                        "Job Queue".into(),
+                        "Background Worker".into(),
+                        "Retry Guard".into(),
+                        "Payments API".into(),
+                    ],
+                    edges: vec![
+                        Edge {
+                            from: "Webhook Handler".into(),
+                            to: "Job Queue".into(),
+                            label: Some("enqueue".into()),
+                        },
+                        Edge {
+                            from: "Job Queue".into(),
+                            to: "Background Worker".into(),
+                            label: Some("claim job".into()),
+                        },
+                        Edge {
+                            from: "Background Worker".into(),
+                            to: "Retry Guard".into(),
+                            label: Some("attempt metadata".into()),
+                        },
+                        Edge {
+                            from: "Retry Guard".into(),
+                            to: "Payments API".into(),
+                            label: Some("retry if allowed".into()),
+                        },
+                    ],
+                }),
+                commit: None,
+                files: vec![],
+            },
+            Section {
+                title: "What still needs verification".into(),
+                text: vec![
+                    "The max-attempt boundary has unit coverage, but an end-to-end replay of a failed webhook still needs a manual run.".into(),
+                    "The dashboard metric for retry exhaustion is wired up but has not been validated against real traffic yet.".into(),
+                ],
+                diagram: None,
+                commit: None,
+                files: vec![],
+            },
+        ],
+        verification: Some(Verification {
+            text: vec![
+                "Unit tests cover attempt counting and backoff decisions.".into(),
+                "A manual replay and the retry-exhaustion metric are the remaining verification steps.".into(),
+            ],
+        }),
+        repo: None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -273,6 +369,7 @@ mod tests {
             ExamplePreset::Timeline,
             ExamplePreset::BeforeAfter,
             ExamplePreset::Followup,
+            ExamplePreset::Handoff,
         ] {
             let document = example_document(preset);
             assert!(document.validate().is_ok());

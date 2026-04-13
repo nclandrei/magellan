@@ -42,6 +42,30 @@ fn sample_payload() -> &'static str {
 }
 
 #[test]
+fn example_command_has_a_handoff_preset() {
+    let temp_dir = tempfile::tempdir().expect("temp dir should be created");
+    let payload_path = temp_dir.path().join("handoff.json");
+
+    let output = Command::cargo_bin("magellan")
+        .expect("binary should build")
+        .args(["example", "--preset", "handoff"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    fs::write(&payload_path, &output).expect("payload should be written");
+
+    Command::cargo_bin("magellan")
+        .expect("binary should build")
+        .args(["validate", "--input"])
+        .arg(&payload_path)
+        .assert()
+        .success();
+}
+
+#[test]
 fn schema_command_prints_a_document_schema() {
     Command::cargo_bin("magellan")
         .expect("binary should build")
