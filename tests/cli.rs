@@ -303,7 +303,7 @@ fn prompt_command_can_customize_topic_source_goal_artifact_and_focus() {
             "optimize for another engineer picking up the work quickly, including decisions and verification",
         ))
         .stdout(predicate::str::contains(
-            "magellan go --input /tmp/session-walkthrough.json",
+            "magellan render --input /tmp/session-walkthrough.json --format markdown --out /tmp/session-walkthrough.md",
         ))
         .stdout(predicate::str::contains(
             "- prioritize what the system now does differently for the user or caller",
