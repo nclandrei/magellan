@@ -58,7 +58,12 @@ fn walkthrough_example() -> Document {
                     "The backend still sees the same valid requests, but avoids obvious noise.".into(),
                 ],
                 diagram: Some(Diagram::Flow {
-                    nodes: vec!["Invalid input".into(), "UI error".into(), "Valid input".into()],
+                    nodes: vec![
+                        "Invalid input".into(),
+                        "UI error".into(),
+                        "Valid input".into(),
+                        "API".into(),
+                    ],
                     edges: vec![
                         Edge {
                             from: "Invalid input".into(),

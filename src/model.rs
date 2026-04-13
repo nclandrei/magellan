@@ -190,6 +190,7 @@ impl Diagram {
                 }
                 for (index, edge) in edges.iter().enumerate() {
                     edge.validate(section_index, index, errors);
+                    validate_edge_endpoints(section_index, index, edge, nodes, errors);
                 }
             }
             Diagram::Timeline { events } => {
@@ -311,6 +312,7 @@ impl Diagram {
                 }
                 for (index, edge) in transitions.iter().enumerate() {
                     edge.validate(section_index, index, errors);
+                    validate_edge_endpoints(section_index, index, edge, states, errors);
                 }
             }
         }
@@ -361,6 +363,25 @@ fn validate_paragraphs(
 
     for (index, paragraph) in paragraphs.iter().enumerate() {
         validate_non_empty(&format!("{field_name}[{index}]"), paragraph, errors);
+    }
+}
+
+fn validate_edge_endpoints(
+    section_index: usize,
+    edge_index: usize,
+    edge: &Edge,
+    declared: &[String],
+    errors: &mut Vec<String>,
+) {
+    for (position, endpoint) in [("from", &edge.from), ("to", &edge.to)] {
+        if endpoint.trim().is_empty() {
+            continue;
+        }
+        if !declared.iter().any(|node| node == endpoint) {
+            errors.push(format!(
+                "sections[{section_index}].diagram.edges[{edge_index}].{position} edge references undeclared node \"{endpoint}\""
+            ));
+        }
     }
 }
 
@@ -425,6 +446,71 @@ mod tests {
     fn validates_a_reasonable_payload() {
         let document = sample_document();
         assert!(document.validate().is_ok());
+    }
+
+    #[test]
+    fn rejects_diagram_edges_that_reference_undeclared_nodes() {
+        let mut document = sample_document();
+        document.sections[0].diagram = Some(Diagram::Flow {
+            nodes: vec![
+                "Invalid input".into(),
+                "UI error".into(),
+                "Valid input".into(),
+            ],
+            edges: vec![
+                Edge {
+                    from: "Invalid input".into(),
+                    to: "UI error".into(),
+                    label: Some("stop locally".into()),
+                },
+                Edge {
+                    from: "Valid input".into(),
+                    to: "API".into(),
+                    label: Some("continue".into()),
+                },
+            ],
+        });
+
+        let error = document.validate().expect_err("payload should be invalid");
+        let error = error
+            .downcast_ref::<ValidationError>()
+            .expect("validation error should downcast");
+
+        assert!(
+            error
+                .messages()
+                .iter()
+                .any(|message| { message.contains("edge references undeclared node \"API\"") }),
+            "expected undeclared-node error, got: {:?}",
+            error.messages()
+        );
+    }
+
+    #[test]
+    fn rejects_state_machine_transitions_referencing_undeclared_states() {
+        let mut document = sample_document();
+        document.sections[0].diagram = Some(Diagram::StateMachine {
+            states: vec!["Idle".into(), "Running".into()],
+            transitions: vec![Edge {
+                from: "Idle".into(),
+                to: "Done".into(),
+                label: Some("finish".into()),
+            }],
+        });
+
+        let error = document.validate().expect_err("payload should be invalid");
+        let error = error
+            .downcast_ref::<ValidationError>()
+            .expect("validation error should downcast");
+
+        assert!(
+            error
+                .messages()
+                .iter()
+                .any(|message| { message.contains("edge references undeclared node \"Done\"") }),
+            "expected undeclared-state error, got: {:?}",
+            error.messages()
+        );
     }
 
     #[test]
