@@ -471,6 +471,25 @@ fn render_markdown_out_writes_alongside_html() {
 }
 
 // ---------------------------------------------------------------------------
+// Docs stay in sync with the real renderer
+// ---------------------------------------------------------------------------
+
+#[test]
+fn readme_does_not_advertise_book_view() {
+    let readme = fs::read_to_string("README.md").expect("README.md should be readable");
+    let lower = readme.to_lowercase();
+
+    assert!(
+        !lower.contains("book view"),
+        "README.md must not advertise the removed book view"
+    );
+    assert!(
+        readme.contains("sidebar"),
+        "README.md should describe the current sidebar HTML layout"
+    );
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 

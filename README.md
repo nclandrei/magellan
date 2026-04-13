@@ -9,7 +9,7 @@ Render structured technical walkthroughs into terminal, Markdown, or HTML.
 
 Magellan is a deterministic presentation engine for AI-generated walkthroughs. An agent or engineer gathers evidence, writes a structured JSON payload, then uses Magellan to validate and render it. Magellan does not inspect a repository by itself, and it does not call an LLM.
 
-Use it when you want a walkthrough that explains behavior, flow, architecture, timing, and verification instead of narrating file churn. HTML output defaults to a paced book view: one summary page, one page per section, an overview toggle, and expandable diagrams.
+Use it when you want a walkthrough that explains behavior, flow, architecture, timing, and verification instead of narrating file churn. HTML output is a self-contained sidebar-scroll layout with a sticky table of contents, inline SVG diagrams you can enlarge, and a light/dark theme toggle.
 
 ## Installation
 
@@ -139,8 +139,8 @@ Content rules:
   - Keep the summary to 1-2 short paragraphs.
   - Keep sections to 3-6 focused chunks.
   - Keep section text short.
-  - In HTML, each section becomes a page in book view.
-  - In book view, diagrams can be clicked to enlarge.
+  - In HTML, each section becomes a scrollable block with a sidebar table of contents.
+  - Diagrams render inline with SVG and can be clicked to enlarge.
   - Use diagrams only when they make the technical explanation easier to follow.
   - Ground the content in real evidence from code, diffs, tests, and persisted session history.
 
@@ -174,16 +174,16 @@ Render targets:
   html      Best for a paced visual walkthrough
 
 HTML behavior:
-  HTML reports are self-contained and open in book view by default.
+  HTML reports are self-contained with a sidebar scroll layout.
 
-  Book view:
-  - starts with the summary
-  - shows one technical slice per page
-  - supports page navigation
-  - lets the user click diagrams to enlarge them
+  Sidebar:
+  - sticky table of contents with links to each section
+  - dark/light theme toggle (preference stored in localStorage)
+  - collapses to a hamburger menu on narrow screens
 
-  Overview view:
-  - shows the full walkthrough as one stacked report
+  Content:
+  - continuous scroll with summary, sections, and verification
+  - diagrams render inline with SVG and an ASCII fallback
 
 Reference files:
   Use these checked-in payloads when you want realistic examples:
