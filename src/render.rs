@@ -1838,7 +1838,7 @@ fn escape_html(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{Diagram, Document, Edge, Section, Verification};
+    use crate::model::{Diagram, Document, Edge, Section, TreeNode, Verification};
     use crate::{ExamplePreset, example_document};
 
     fn sample_document() -> Document {
@@ -1983,6 +1983,157 @@ mod tests {
             !rendered.contains("T[\""),
             "table must not wrap rows inside a flowchart node"
         );
+    }
+
+    fn doc_with_diagram(title: &str, diagram: Diagram) -> Document {
+        Document {
+            title: title.into(),
+            summary: vec!["Short summary.".into()],
+            sections: vec![
+                Section {
+                    title: "Diagram section".into(),
+                    text: vec!["The diagram shows the structure.".into()],
+                    diagram: Some(diagram),
+                    commit: None,
+                    files: vec![],
+                },
+                Section {
+                    title: "Follow-up".into(),
+                    text: vec!["Why it matters.".into()],
+                    diagram: None,
+                    commit: None,
+                    files: vec![],
+                },
+            ],
+            verification: None,
+            repo: None,
+        }
+    }
+
+    #[test]
+    fn state_machine_renders_in_all_three_formats() {
+        let doc = doc_with_diagram(
+            "State machine rendering",
+            Diagram::StateMachine {
+                states: vec!["Idle".into(), "Running".into(), "Done".into()],
+                transitions: vec![
+                    Edge {
+                        from: "Idle".into(),
+                        to: "Running".into(),
+                        label: Some("start".into()),
+                    },
+                    Edge {
+                        from: "Running".into(),
+                        to: "Done".into(),
+                        label: Some("finish".into()),
+                    },
+                ],
+            },
+        );
+
+        let terminal = render_document(&doc, OutputFormat::Terminal);
+        assert!(terminal.contains("State machine"));
+        assert!(terminal.contains("Idle --start--> Running"));
+        assert!(terminal.contains("Running --finish--> Done"));
+
+        let markdown = render_document(&doc, OutputFormat::Markdown);
+        assert!(markdown.contains("stateDiagram-v2"));
+        assert!(markdown.contains("Idle --> Running: start"));
+
+        let html = render_document(&doc, OutputFormat::Html);
+        assert!(html.contains("State machine"));
+        assert!(html.contains("<svg viewBox="));
+    }
+
+    #[test]
+    fn layer_stack_renders_in_all_three_formats() {
+        let doc = doc_with_diagram(
+            "Layer stack rendering",
+            Diagram::LayerStack {
+                layers: vec!["Edge".into(), "Auth".into(), "App".into(), "DB".into()],
+            },
+        );
+
+        let terminal = render_document(&doc, OutputFormat::Terminal);
+        assert!(terminal.contains("Layer stack"));
+        assert!(terminal.contains("[Edge]"));
+        assert!(terminal.contains("[DB]"));
+
+        let markdown = render_document(&doc, OutputFormat::Markdown);
+        assert!(markdown.contains("block-beta"));
+        assert!(markdown.contains("L0[\"Edge\"]"));
+        assert!(markdown.contains("L3[\"DB\"]"));
+
+        let html = render_document(&doc, OutputFormat::Html);
+        assert!(html.contains("Layer stack"));
+        assert!(html.contains("<svg viewBox="));
+    }
+
+    #[test]
+    fn table_diagram_renders_in_all_three_formats() {
+        let doc = doc_with_diagram(
+            "Table rendering",
+            Diagram::Table {
+                headers: vec!["Role".into(), "Read".into(), "Write".into()],
+                rows: vec![
+                    vec!["admin".into(), "yes".into(), "yes".into()],
+                    vec!["viewer".into(), "yes".into(), "no".into()],
+                ],
+            },
+        );
+
+        let terminal = render_document(&doc, OutputFormat::Terminal);
+        assert!(terminal.contains("Role"));
+        assert!(terminal.contains("admin"));
+        assert!(terminal.contains("-+-"));
+
+        let markdown = render_document(&doc, OutputFormat::Markdown);
+        assert!(markdown.contains("| Role | Read | Write |"));
+        assert!(markdown.contains("| --- | --- | --- |"));
+        assert!(markdown.contains("| admin | yes | yes |"));
+
+        let html = render_document(&doc, OutputFormat::Html);
+        assert!(html.contains("Table"));
+        assert!(html.contains("<svg viewBox="));
+    }
+
+    #[test]
+    fn dependency_tree_renders_in_all_three_formats() {
+        let doc = doc_with_diagram(
+            "Dependency tree rendering",
+            Diagram::DependencyTree {
+                root: "service".into(),
+                children: vec![
+                    TreeNode {
+                        label: "api".into(),
+                        children: vec![TreeNode {
+                            label: "routes".into(),
+                            children: vec![],
+                        }],
+                    },
+                    TreeNode {
+                        label: "worker".into(),
+                        children: vec![],
+                    },
+                ],
+            },
+        );
+
+        let terminal = render_document(&doc, OutputFormat::Terminal);
+        assert!(terminal.contains("service"));
+        assert!(terminal.contains("├── api"));
+        assert!(terminal.contains("└── worker"));
+        assert!(terminal.contains("└── routes"));
+
+        let markdown = render_document(&doc, OutputFormat::Markdown);
+        assert!(markdown.contains("flowchart TD"));
+        assert!(markdown.contains("ROOT[\"service\"]"));
+        assert!(markdown.contains("[\"api\"]"));
+        assert!(markdown.contains("[\"routes\"]"));
+
+        let html = render_document(&doc, OutputFormat::Html);
+        assert!(html.contains("Dependency tree"));
+        assert!(html.contains("<svg viewBox="));
     }
 
     #[test]
