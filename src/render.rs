@@ -1848,30 +1848,39 @@ mod tests {
                 "A short summary explains the outcome in product terms.".into(),
                 "A second paragraph adds only the necessary context.".into(),
             ],
-            sections: vec![Section {
-                title: "New flow".into(),
-                text: vec![
-                    "The UI validates first.".into(),
-                    "Only valid requests continue to the backend.".into(),
-                ],
-                diagram: Some(Diagram::Sequence {
-                    nodes: vec!["User".into(), "UI".into(), "API".into()],
-                    edges: vec![
-                        Edge {
-                            from: "User".into(),
-                            to: "UI".into(),
-                            label: Some("submit".into()),
-                        },
-                        Edge {
-                            from: "UI".into(),
-                            to: "API".into(),
-                            label: Some("valid request".into()),
-                        },
+            sections: vec![
+                Section {
+                    title: "New flow".into(),
+                    text: vec![
+                        "The UI validates first.".into(),
+                        "Only valid requests continue to the backend.".into(),
                     ],
-                }),
-                commit: None,
-                files: vec![],
-            }],
+                    diagram: Some(Diagram::Sequence {
+                        nodes: vec!["User".into(), "UI".into(), "API".into()],
+                        edges: vec![
+                            Edge {
+                                from: "User".into(),
+                                to: "UI".into(),
+                                label: Some("submit".into()),
+                            },
+                            Edge {
+                                from: "UI".into(),
+                                to: "API".into(),
+                                label: Some("valid request".into()),
+                            },
+                        ],
+                    }),
+                    commit: None,
+                    files: vec![],
+                },
+                Section {
+                    title: "Why it matters".into(),
+                    text: vec!["Errors surface immediately rather than after a round-trip.".into()],
+                    diagram: None,
+                    commit: None,
+                    files: vec![],
+                },
+            ],
             verification: Some(Verification {
                 text: vec!["An integration test and a quick manual check passed.".into()],
             }),

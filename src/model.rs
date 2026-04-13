@@ -130,9 +130,9 @@ impl Document {
         validate_non_empty("title", &self.title, &mut errors);
         validate_paragraphs("summary", &self.summary, 1, 2, &mut errors);
 
-        if !(1..=6).contains(&self.sections.len()) {
+        if !(2..=6).contains(&self.sections.len()) {
             errors.push(format!(
-                "sections must contain between 1 and 6 entries, found {}",
+                "sections must contain between 2 and 6 entries, found {}",
                 self.sections.len()
             ));
         }
@@ -446,6 +446,26 @@ mod tests {
     fn validates_a_reasonable_payload() {
         let document = sample_document();
         assert!(document.validate().is_ok());
+    }
+
+    #[test]
+    fn rejects_documents_with_fewer_than_two_sections() {
+        let mut document = sample_document();
+        document.sections.truncate(1);
+
+        let error = document.validate().expect_err("payload should be invalid");
+        let error = error
+            .downcast_ref::<ValidationError>()
+            .expect("validation error should downcast");
+
+        assert!(
+            error
+                .messages()
+                .iter()
+                .any(|message| message.contains("sections must contain between 2 and 6 entries")),
+            "expected sections count error, got: {:?}",
+            error.messages()
+        );
     }
 
     #[test]

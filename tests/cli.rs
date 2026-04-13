@@ -25,6 +25,12 @@ fn sample_payload() -> &'static str {
           { "from": "Form", "to": "API", "label": "valid request" }
         ]
       }
+    },
+    {
+      "title": "Why it matters",
+      "text": [
+        "Feedback arrives before a round-trip, so broken submissions never reach the backend."
+      ]
     }
   ],
   "verification": {

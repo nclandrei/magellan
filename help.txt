@@ -85,7 +85,7 @@ Session evidence:
 
 Content rules:
   - Keep the summary to 1-2 short paragraphs.
-  - Keep sections to 3-6 focused chunks.
+  - Keep sections to 2-6 focused chunks.
   - Keep section text short.
   - In HTML, each section becomes a scrollable block with a sidebar table of contents.
   - Diagrams render inline with SVG and an ASCII fallback.

@@ -96,30 +96,42 @@ fn timeline_example() -> Document {
         summary: vec![
             "We simplified the search flow in a few discrete steps rather than one opaque rewrite.".into(),
         ],
-        sections: vec![Section {
-            title: "Implementation timeline".into(),
-            text: vec![
-                "The work moved from request shaping, to UI loading state cleanup, to final verification.".into(),
-            ],
-            diagram: Some(Diagram::Timeline {
-                events: vec![
-                    TimelineEvent {
-                        label: "Step 1".into(),
-                        detail: "Normalize search params before the API call.".into(),
-                    },
-                    TimelineEvent {
-                        label: "Step 2".into(),
-                        detail: "Show a single loading state instead of overlapping spinners.".into(),
-                    },
-                    TimelineEvent {
-                        label: "Step 3".into(),
-                        detail: "Add a regression test for stale result rendering.".into(),
-                    },
+        sections: vec![
+            Section {
+                title: "Implementation timeline".into(),
+                text: vec![
+                    "The work moved from request shaping, to UI loading state cleanup, to final verification.".into(),
                 ],
-            }),
-            commit: None,
-            files: vec![],
-        }],
+                diagram: Some(Diagram::Timeline {
+                    events: vec![
+                        TimelineEvent {
+                            label: "Step 1".into(),
+                            detail: "Normalize search params before the API call.".into(),
+                        },
+                        TimelineEvent {
+                            label: "Step 2".into(),
+                            detail: "Show a single loading state instead of overlapping spinners.".into(),
+                        },
+                        TimelineEvent {
+                            label: "Step 3".into(),
+                            detail: "Add a regression test for stale result rendering.".into(),
+                        },
+                    ],
+                }),
+                commit: None,
+                files: vec![],
+            },
+            Section {
+                title: "Why the ordering mattered".into(),
+                text: vec![
+                    "Request shaping had to land first so the UI cleanup could rely on a single stable response shape.".into(),
+                    "Only after that did the regression test have a deterministic target to assert against.".into(),
+                ],
+                diagram: None,
+                commit: None,
+                files: vec![],
+            },
+        ],
         verification: Some(Verification {
             text: vec!["Manual search checks and automated tests both passed.".into()],
         }),
@@ -133,26 +145,37 @@ fn before_after_example() -> Document {
         summary: vec![
             "The new flow turns a late backend failure into an earlier, clearer frontend validation step.".into(),
         ],
-        sections: vec![Section {
-            title: "Behavior change".into(),
-            text: vec![
-                "This is useful when the main point is how the user experience changed.".into(),
-            ],
-            diagram: Some(Diagram::BeforeAfter(BeforeAfterDiagram {
-                before: vec![
-                    "User submits incomplete form".into(),
-                    "API rejects the payload".into(),
-                    "User sees a generic error".into(),
+        sections: vec![
+            Section {
+                title: "Behavior change".into(),
+                text: vec![
+                    "This is useful when the main point is how the user experience changed.".into(),
                 ],
-                after: vec![
-                    "User submits incomplete form".into(),
-                    "UI highlights the missing field".into(),
-                    "API only receives valid requests".into(),
+                diagram: Some(Diagram::BeforeAfter(BeforeAfterDiagram {
+                    before: vec![
+                        "User submits incomplete form".into(),
+                        "API rejects the payload".into(),
+                        "User sees a generic error".into(),
+                    ],
+                    after: vec![
+                        "User submits incomplete form".into(),
+                        "UI highlights the missing field".into(),
+                        "API only receives valid requests".into(),
+                    ],
+                })),
+                commit: None,
+                files: vec![],
+            },
+            Section {
+                title: "Why this matters".into(),
+                text: vec![
+                    "Moving the error to the UI makes feedback immediate and keeps the backend logs focused on real failures.".into(),
                 ],
-            })),
-            commit: None,
-            files: vec![],
-        }],
+                diagram: None,
+                commit: None,
+                files: vec![],
+            },
+        ],
         verification: Some(Verification {
             text: vec!["A regression test now covers the invalid submission path.".into()],
         }),
