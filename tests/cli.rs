@@ -223,7 +223,7 @@ fn schema_help_explains_the_contract_workflow() {
             "magellan schema > /tmp/magellan-schema.json",
         ))
         .stdout(predicate::str::contains(
-            "summary` with 1-2 short paragraphs",
+            "summary`: array of 1-2 short paragraphs (NOT a plain string)",
         ));
 }
 

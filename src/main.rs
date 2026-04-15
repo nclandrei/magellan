@@ -77,10 +77,10 @@ Typical flow:
   magellan validate --input /tmp/magellan.json
 
 Payload shape reminders:
-  - `title`
-  - `summary` with 1-2 short paragraphs
-  - `sections` with 3-6 focused chunks
-  - optional `verification`";
+  - `title`: string
+  - `summary`: array of 1-2 short paragraphs (NOT a plain string)
+  - `sections`: array of 1-6 objects, each with `title` (string) and `text` (array of strings)
+  - optional `verification`: object with `text` (array of strings)";
 
 const EXAMPLE_AFTER_HELP: &str = "\
 Starter presets:
@@ -475,15 +475,24 @@ fn prompt_text(options: PromptOptions<'_>) -> String {
 Workflow:
 1. Gather evidence using this source of truth:
 {source_guidance}
-2. Run `magellan schema`.
-3. Optionally run `magellan example --preset walkthrough` for a starter payload.
-4. Create JSON at `{artifact}` with:
-   - `title`
-   - `summary` with 1-2 short paragraphs
-   - `sections` shaped for this goal: {section_guidance}
-   - short `text` arrays instead of long prose
-   - optional `diagram` objects when they clarify the technical flow
-   - optional `verification`
+2. Run `magellan example --preset walkthrough` to see a valid payload with correct types.
+3. Optionally run `magellan schema` for the full JSON Schema.
+4. Create JSON at `{artifact}` matching this skeleton:
+   {{
+     \"title\": \"string\",
+     \"summary\": [\"paragraph 1\", \"paragraph 2\"],
+     \"sections\": [
+       {{
+         \"title\": \"string\",
+         \"text\": [\"short paragraph 1\", \"short paragraph 2\"],
+         \"diagram\": {{ ... }}
+       }}
+     ],
+     \"verification\": {{ \"text\": [\"paragraph\"] }}
+   }}
+   IMPORTANT: `summary`, `text`, and `verification.text` are arrays of strings, NOT plain strings.
+   Section guidance: {section_guidance}
+   Use `diagram` objects only when they clarify the technical flow.
 5. {render_step}
    Do not skip this step. The rendered artifacts are the deliverable, not a prose summary.
 

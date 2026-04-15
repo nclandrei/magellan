@@ -45,13 +45,23 @@ Normal workflow:
      - branch compared to trunk
      - pull request description, comments, and diff
   2. Learn the payload contract.
-     - run: `magellan schema`
-     - optional starter payload: `magellan example --preset walkthrough`
-  3. Write a JSON payload with:
-     - `title`
-     - `summary`
-     - `sections`
-     - optional `verification`
+     - run: `magellan example --preset walkthrough` to see a valid payload
+     - run: `magellan schema` for the full JSON Schema if needed
+  3. Write a JSON payload matching this skeleton:
+     {
+       "title": "string",
+       "summary": ["paragraph 1", "paragraph 2"],
+       "sections": [
+         {
+           "title": "string",
+           "text": ["short paragraph 1", "short paragraph 2"],
+           "diagram": { ... }
+         }
+       ],
+       "verification": { "text": ["paragraph"] }
+     }
+     IMPORTANT: `summary`, `text`, and `verification.text` are arrays of
+     strings, NOT plain strings. Each entry is one short paragraph.
   4. Validate and render. This step is mandatory, do not skip it.
      - run: `magellan go --input /tmp/magellan.json`
 
