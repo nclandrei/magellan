@@ -1444,7 +1444,11 @@ fn render_table_svg(id: &str, headers: &[String], rows: &[Vec<String>]) -> Strin
     let row_heights: Vec<i32> = wrapped_rows
         .iter()
         .map(|row| {
-            let max_lines = row.iter().map(|lines| lines.len() as i32).max().unwrap_or(1);
+            let max_lines = row
+                .iter()
+                .map(|lines| lines.len() as i32)
+                .max()
+                .unwrap_or(1);
             (max_lines * line_height + cell_pad_y).max(36)
         })
         .collect();

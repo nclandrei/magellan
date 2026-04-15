@@ -465,6 +465,8 @@ fn prompt_text(options: PromptOptions<'_>) -> String {
     let question_guidance = prompt_question_guidance(options.question);
     let scope_guidance = prompt_scope_guidance(options.scope);
     let diagram_guidance = prompt_diagram_guidance(options.goal, options.focus);
+    let verification_guidance = prompt_verification_guidance(options.goal, options.focus);
+    let verification_skeleton = prompt_verification_skeleton(options.goal, options.focus);
 
     let (render_step, render_target_line) =
         prompt_render_step(options.render_format, options.artifact);
@@ -488,8 +490,7 @@ Workflow:
          \"diagram\": {{ ... }}
        }}
      ],
-     \"verification\": {{ \"text\": [\"paragraph\"] }}
-   }}
+{verification_skeleton}   }}
    IMPORTANT: `summary`, `text`, and `verification.text` are arrays of strings, NOT plain strings.
    Section guidance: {section_guidance}
    Use `diagram` objects only when they clarify the technical flow.
@@ -505,6 +506,7 @@ Content rules:
 - Prefer diagrams only when they make the technical explanation easier to follow.
 - Do not describe the walkthrough in prose and then ask if the user wants a report.
   The rendered artifacts are always the expected output.
+{verification_guidance}
 
 Diagram selection:
 {diagram_guidance}
@@ -533,7 +535,9 @@ Required final step:
         question_guidance = question_guidance,
         scope_guidance = scope_guidance,
         focus_guidance = focus_guidance,
-        diagram_guidance = diagram_guidance
+        diagram_guidance = diagram_guidance,
+        verification_guidance = verification_guidance,
+        verification_skeleton = verification_skeleton
     )
 }
 
@@ -747,6 +751,26 @@ fn prompt_goal_section_guidance(goal: CliPromptGoal) -> &'static str {
         CliPromptGoal::Handoff => {
             "3-6 focused steps, with explicit attention to decisions, risks, and verification"
         }
+    }
+}
+
+fn wants_verification(goal: CliPromptGoal, focuses: &[CliPromptFocus]) -> bool {
+    goal == CliPromptGoal::Handoff || focuses.contains(&CliPromptFocus::Verification)
+}
+
+fn prompt_verification_guidance(goal: CliPromptGoal, focuses: &[CliPromptFocus]) -> &'static str {
+    if wants_verification(goal, focuses) {
+        "- include a `verification` section summarizing what was checked and what evidence exists"
+    } else {
+        "- omit the `verification` field unless there is specific evidence worth calling out separately from the narrative"
+    }
+}
+
+fn prompt_verification_skeleton(goal: CliPromptGoal, focuses: &[CliPromptFocus]) -> &'static str {
+    if wants_verification(goal, focuses) {
+        "     \"verification\": {{ \"text\": [\"paragraph\"] }}\n"
+    } else {
+        ""
     }
 }
 

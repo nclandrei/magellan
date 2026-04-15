@@ -258,8 +258,7 @@ fn example_command_prints_followup_preset() {
         ))
         .stdout(predicate::str::contains(
             "\"title\": \"Why the worker owns retries now\"",
-        ))
-        .stdout(predicate::str::contains("\"verification\": {"));
+        ));
 }
 
 #[test]
@@ -340,6 +339,9 @@ fn prompt_command_can_customize_topic_source_goal_artifact_and_focus() {
         ))
         .stdout(predicate::str::contains(
             "- give verification its own section and be explicit about evidence",
+        ))
+        .stdout(predicate::str::contains(
+            "include a `verification` section",
         ));
 }
 
@@ -380,6 +382,9 @@ fn prompt_command_can_target_followup_goal() {
         ))
         .stdout(predicate::str::contains(
             "use `before_after` when the main point is how behavior changed for the user or caller",
+        ))
+        .stdout(predicate::str::contains(
+            "omit the `verification` field",
         ));
 }
 

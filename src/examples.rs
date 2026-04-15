@@ -83,11 +83,7 @@ fn walkthrough_example() -> Document {
                 files: vec![],
             },
         ],
-        verification: Some(Verification {
-            text: vec![
-                "An integration test covered the regression and a manual form submission confirmed the new error state.".into(),
-            ],
-        }),
+        verification: None,
         repo: None,
     }
 }
@@ -134,9 +130,7 @@ fn timeline_example() -> Document {
                 files: vec![],
             },
         ],
-        verification: Some(Verification {
-            text: vec!["Manual search checks and automated tests both passed.".into()],
-        }),
+        verification: None,
         repo: None,
     }
 }
@@ -178,9 +172,7 @@ fn before_after_example() -> Document {
                 files: vec![],
             },
         ],
-        verification: Some(Verification {
-            text: vec!["A regression test now covers the invalid submission path.".into()],
-        }),
+        verification: None,
         repo: None,
     }
 }
@@ -255,11 +247,7 @@ fn followup_example() -> Document {
                 files: vec![],
             },
         ],
-        verification: Some(Verification {
-            text: vec![
-                "A worker-focused test now covers max-attempt handling, and a manual replay of a failed job confirmed that retries stop at the expected boundary.".into(),
-            ],
-        }),
+        verification: None,
         repo: None,
     }
 }
