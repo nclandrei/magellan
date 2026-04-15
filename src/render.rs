@@ -175,7 +175,7 @@ fn render_html(document: &Document) -> String {
   <nav class=\"sidebar\" data-sidebar>
     <div class=\"sidebar-header\">
       <p class=\"eyebrow\">Contents</p>
-      <button class=\"theme-toggle\" type=\"button\" data-theme-toggle aria-label=\"Toggle light/dark mode\">Toggle theme</button>
+      <button class=\"theme-toggle\" type=\"button\" data-theme-toggle aria-label=\"Toggle light/dark mode\"><span class=\"theme-icon-sun\">☀️</span><span class=\"theme-icon-moon\">🌙</span></button>
     </div>
     <a class=\"toc-link is-active\" href=\"#summary\">Summary</a>
 {toc_html}{verification_toc}
@@ -437,6 +437,9 @@ fn html_style() -> &'static str {
       color: var(--ink);
       background: var(--bg);
     }
+    .theme-icon-moon { display: none; }
+    [data-theme="light"] .theme-icon-sun { display: none; }
+    [data-theme="light"] .theme-icon-moon { display: inline; }
     .toc-link {
       display: block;
       padding: 6px 10px;
@@ -712,6 +715,14 @@ fn html_script() -> &'static str {
       const stored = localStorage.getItem('magellan-theme');
       if (stored === 'light') document.documentElement.setAttribute('data-theme', 'light');
 
+      function updateThemeIcon() {
+        if (!themeBtn) return;
+        const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+        const sun = themeBtn.querySelector('.theme-icon-sun');
+        const moon = themeBtn.querySelector('.theme-icon-moon');
+        if (sun) sun.style.display = isLight ? 'none' : 'inline';
+        if (moon) moon.style.display = isLight ? 'inline' : 'none';
+      }
       function toggleTheme() {
         const isLight = document.documentElement.getAttribute('data-theme') === 'light';
         if (isLight) {
@@ -721,8 +732,10 @@ fn html_script() -> &'static str {
           document.documentElement.setAttribute('data-theme', 'light');
           localStorage.setItem('magellan-theme', 'light');
         }
+        updateThemeIcon();
       }
       if (themeBtn) themeBtn.addEventListener('click', toggleTheme);
+      updateThemeIcon();
 
       if (openBtn) openBtn.addEventListener('click', () => sidebar && sidebar.classList.add('is-open'));
       if (closeBtn) closeBtn.addEventListener('click', () => sidebar && sidebar.classList.remove('is-open'));
@@ -1381,19 +1394,79 @@ fn render_dependency_tree_svg(id: &str, root: &str, children: &[TreeNode]) -> St
 
 fn render_table_svg(id: &str, headers: &[String], rows: &[Vec<String>]) -> String {
     let padding = 24;
-    let row_height = 36;
+    let line_height = 16;
+    let cell_pad_y = 12;
     let header_height = 40;
-    let col_count = headers.len() as i32;
-    let col_width = 160;
-    let width = padding * 2 + col_count * col_width;
-    let total_rows = rows.len() as i32;
-    let height = padding * 2 + header_height + total_rows * row_height + 2;
+    let col_count = headers.len();
+    let min_col_width: i32 = 120;
+    let max_col_width: i32 = 300;
+    let col_pad: i32 = 24;
+    let px_per_char: f32 = 7.2;
+
+    // Compute per-column widths based on content
+    let col_widths: Vec<i32> = (0..col_count)
+        .map(|col| {
+            let mut max_chars = headers[col].len();
+            for row in rows {
+                if let Some(cell) = row.get(col) {
+                    max_chars = max_chars.max(cell.len());
+                }
+            }
+            let natural = (max_chars as f32 * px_per_char).ceil() as i32 + col_pad;
+            natural.clamp(min_col_width, max_col_width)
+        })
+        .collect();
+
+    // Max characters that fit in each column (for wrapping)
+    let col_max_chars: Vec<usize> = col_widths
+        .iter()
+        .map(|w| ((*w - col_pad) as f32 / px_per_char).floor().max(8.0) as usize)
+        .collect();
+
+    // Wrap cell text and compute per-row heights
+    let wrapped_rows: Vec<Vec<Vec<String>>> = rows
+        .iter()
+        .map(|row| {
+            (0..col_count)
+                .map(|col| {
+                    let text = row.get(col).map(|s| s.as_str()).unwrap_or("");
+                    let lines = wrap_text(text, col_max_chars[col]);
+                    if lines.is_empty() {
+                        vec![String::new()]
+                    } else {
+                        lines
+                    }
+                })
+                .collect()
+        })
+        .collect();
+
+    let row_heights: Vec<i32> = wrapped_rows
+        .iter()
+        .map(|row| {
+            let max_lines = row.iter().map(|lines| lines.len() as i32).max().unwrap_or(1);
+            (max_lines * line_height + cell_pad_y).max(36)
+        })
+        .collect();
+
+    // Layout
+    let table_width: i32 = col_widths.iter().sum();
+    let table_height: i32 = header_height + row_heights.iter().sum::<i32>();
+    let width = padding * 2 + table_width;
+    let height = padding * 2 + table_height + 2;
     let marker_id = format!("{id}-arrow");
     let mut body = String::new();
 
+    let col_x_offsets: Vec<i32> = col_widths
+        .iter()
+        .scan(0, |acc, &w| {
+            let offset = *acc;
+            *acc += w;
+            Some(offset)
+        })
+        .collect();
+
     // Table outline
-    let table_width = col_count * col_width;
-    let table_height = header_height + total_rows * row_height;
     write!(
         &mut body,
         "<rect class=\"panel-box\" x=\"{padding}\" y=\"{padding}\" width=\"{table_width}\" height=\"{table_height}\" rx=\"6\" ry=\"6\"/>"
@@ -1410,8 +1483,8 @@ fn render_table_svg(id: &str, headers: &[String], rows: &[Vec<String>]) -> Strin
     .unwrap();
 
     // Column separator lines
-    for col in 1..col_count {
-        let x = padding + col * col_width;
+    for offset in col_x_offsets.iter().skip(1) {
+        let x = padding + offset;
         write!(
             &mut body,
             "<line class=\"lane\" x1=\"{x}\" y1=\"{padding}\" x2=\"{x}\" y2=\"{}\"/>",
@@ -1422,7 +1495,7 @@ fn render_table_svg(id: &str, headers: &[String], rows: &[Vec<String>]) -> Strin
 
     // Header text
     for (col, header) in headers.iter().enumerate() {
-        let x = padding + col as i32 * col_width + col_width / 2;
+        let x = padding + col_x_offsets[col] + col_widths[col] / 2;
         let y = padding + header_height / 2 + 5;
         write_multiline_svg_text(
             &mut body,
@@ -1435,9 +1508,8 @@ fn render_table_svg(id: &str, headers: &[String], rows: &[Vec<String>]) -> Strin
     }
 
     // Data rows
-    for (row_index, row) in rows.iter().enumerate() {
-        let row_y = padding + header_height + row_index as i32 * row_height;
-        // Row separator (skip first)
+    let mut row_y = padding + header_height;
+    for (row_index, wrapped_row) in wrapped_rows.iter().enumerate() {
         if row_index > 0 {
             write!(
                 &mut body,
@@ -1446,18 +1518,14 @@ fn render_table_svg(id: &str, headers: &[String], rows: &[Vec<String>]) -> Strin
             )
             .unwrap();
         }
-        for (col, cell) in row.iter().enumerate() {
-            let x = padding + col as i32 * col_width + col_width / 2;
-            let y = row_y + row_height / 2 + 5;
-            write_multiline_svg_text(
-                &mut body,
-                x,
-                y,
-                std::slice::from_ref(cell),
-                "middle",
-                "event-copy",
-            );
+        let rh = row_heights[row_index];
+        for (col, lines) in wrapped_row.iter().enumerate() {
+            let x = padding + col_x_offsets[col] + col_widths[col] / 2;
+            let block_height = lines.len() as i32 * line_height;
+            let y = row_y + (rh - block_height) / 2 + line_height - 2;
+            write_multiline_svg_text(&mut body, x, y, lines, "middle", "event-copy");
         }
+        row_y += rh;
     }
 
     svg_shell(
@@ -2590,6 +2658,31 @@ mod tests {
         let html = render_document(&doc, OutputFormat::Html);
         assert!(html.contains("Dependency tree"));
         assert!(html.contains("<svg viewBox="));
+    }
+
+    #[test]
+    fn theme_toggle_uses_sun_moon_icons() {
+        let rendered = render_document(&sample_document(), OutputFormat::Html);
+
+        // Button should NOT contain the old text label
+        assert!(
+            !rendered.contains(">Toggle theme</button>"),
+            "theme toggle should use icons, not text"
+        );
+        // Button should contain sun and moon symbols
+        assert!(
+            rendered.contains("☀️"),
+            "theme toggle should contain a sun icon for light mode"
+        );
+        assert!(
+            rendered.contains("🌙"),
+            "theme toggle should contain a moon icon for dark mode"
+        );
+        // The JS should swap the icon on toggle
+        assert!(
+            rendered.contains("updateThemeIcon"),
+            "theme toggle JS should include an icon-update function"
+        );
     }
 
     #[test]
