@@ -66,6 +66,43 @@ pub enum Diagram {
         root: String,
         children: Vec<TreeNode>,
     },
+    EntityRelationship {
+        entities: Vec<Entity>,
+        relationships: Vec<Relationship>,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct Entity {
+    pub name: String,
+    pub fields: Vec<Field>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct Field {
+    pub name: String,
+    #[serde(rename = "type")]
+    pub field_type: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct Relationship {
+    pub from: String,
+    pub to: String,
+    pub cardinality: Cardinality,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Cardinality {
+    OneToOne,
+    OneToMany,
+    ManyToOne,
+    ManyToMany,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -287,6 +324,75 @@ impl Diagram {
                         child,
                         errors,
                     );
+                }
+            }
+            Diagram::EntityRelationship {
+                entities,
+                relationships,
+            } => {
+                if entities.len() < 2 {
+                    errors.push(format!(
+                        "sections[{section_index}].diagram requires at least 2 entities"
+                    ));
+                }
+                for (entity_index, entity) in entities.iter().enumerate() {
+                    validate_non_empty(
+                        &format!("sections[{section_index}].diagram.entities[{entity_index}].name"),
+                        &entity.name,
+                        errors,
+                    );
+                    if entity.fields.is_empty() {
+                        errors.push(format!(
+                            "sections[{section_index}].diagram.entities[{entity_index}].fields requires at least 1 field"
+                        ));
+                    }
+                    for (field_index, field) in entity.fields.iter().enumerate() {
+                        validate_non_empty(
+                            &format!(
+                                "sections[{section_index}].diagram.entities[{entity_index}].fields[{field_index}].name"
+                            ),
+                            &field.name,
+                            errors,
+                        );
+                        validate_non_empty(
+                            &format!(
+                                "sections[{section_index}].diagram.entities[{entity_index}].fields[{field_index}].type"
+                            ),
+                            &field.field_type,
+                            errors,
+                        );
+                        if let Some(note) = &field.note {
+                            validate_non_empty(
+                                &format!(
+                                    "sections[{section_index}].diagram.entities[{entity_index}].fields[{field_index}].note"
+                                ),
+                                note,
+                                errors,
+                            );
+                        }
+                    }
+                }
+
+                let entity_names: Vec<String> =
+                    entities.iter().map(|entity| entity.name.clone()).collect();
+                for (rel_index, rel) in relationships.iter().enumerate() {
+                    let path =
+                        format!("sections[{section_index}].diagram.relationships[{rel_index}]");
+                    validate_non_empty(&format!("{path}.from"), &rel.from, errors);
+                    validate_non_empty(&format!("{path}.to"), &rel.to, errors);
+                    if let Some(label) = &rel.label {
+                        validate_non_empty(&format!("{path}.label"), label, errors);
+                    }
+                    for (position, endpoint) in [("from", &rel.from), ("to", &rel.to)] {
+                        if endpoint.trim().is_empty() {
+                            continue;
+                        }
+                        if !entity_names.iter().any(|name| name == endpoint) {
+                            errors.push(format!(
+                                "{path}.{position} references undeclared entity \"{endpoint}\""
+                            ));
+                        }
+                    }
                 }
             }
             Diagram::StateMachine {
@@ -529,6 +635,224 @@ mod tests {
                 .iter()
                 .any(|message| { message.contains("edge references undeclared node \"Done\"") }),
             "expected undeclared-state error, got: {:?}",
+            error.messages()
+        );
+    }
+
+    #[test]
+    fn accepts_entity_relationship_diagram_with_fields_and_relationships() {
+        let mut document = sample_document();
+        document.sections[0].diagram = Some(Diagram::EntityRelationship {
+            entities: vec![
+                Entity {
+                    name: "User".into(),
+                    fields: vec![
+                        Field {
+                            name: "id".into(),
+                            field_type: "uuid".into(),
+                            note: Some("PK".into()),
+                        },
+                        Field {
+                            name: "email".into(),
+                            field_type: "string".into(),
+                            note: None,
+                        },
+                    ],
+                },
+                Entity {
+                    name: "Order".into(),
+                    fields: vec![
+                        Field {
+                            name: "id".into(),
+                            field_type: "uuid".into(),
+                            note: Some("PK".into()),
+                        },
+                        Field {
+                            name: "user_id".into(),
+                            field_type: "uuid".into(),
+                            note: Some("FK".into()),
+                        },
+                    ],
+                },
+            ],
+            relationships: vec![Relationship {
+                from: "User".into(),
+                to: "Order".into(),
+                cardinality: Cardinality::OneToMany,
+                label: Some("places".into()),
+            }],
+        });
+
+        document
+            .validate()
+            .expect("ER diagram payload should validate");
+    }
+
+    #[test]
+    fn rejects_entity_relationship_with_too_few_entities() {
+        let mut document = sample_document();
+        document.sections[0].diagram = Some(Diagram::EntityRelationship {
+            entities: vec![Entity {
+                name: "User".into(),
+                fields: vec![Field {
+                    name: "id".into(),
+                    field_type: "uuid".into(),
+                    note: None,
+                }],
+            }],
+            relationships: vec![],
+        });
+
+        let error = document.validate().expect_err("payload should be invalid");
+        let error = error
+            .downcast_ref::<ValidationError>()
+            .expect("validation error should downcast");
+
+        assert!(
+            error
+                .messages()
+                .iter()
+                .any(|m| m.contains("requires at least 2 entities")),
+            "expected entities-count error, got: {:?}",
+            error.messages()
+        );
+    }
+
+    #[test]
+    fn rejects_entity_relationship_entity_without_fields() {
+        let mut document = sample_document();
+        document.sections[0].diagram = Some(Diagram::EntityRelationship {
+            entities: vec![
+                Entity {
+                    name: "User".into(),
+                    fields: vec![],
+                },
+                Entity {
+                    name: "Order".into(),
+                    fields: vec![Field {
+                        name: "id".into(),
+                        field_type: "uuid".into(),
+                        note: None,
+                    }],
+                },
+            ],
+            relationships: vec![Relationship {
+                from: "User".into(),
+                to: "Order".into(),
+                cardinality: Cardinality::OneToMany,
+                label: None,
+            }],
+        });
+
+        let error = document.validate().expect_err("payload should be invalid");
+        let error = error
+            .downcast_ref::<ValidationError>()
+            .expect("validation error should downcast");
+
+        assert!(
+            error
+                .messages()
+                .iter()
+                .any(|m| m.contains("entities[0].fields") && m.contains("at least 1")),
+            "expected per-entity field requirement, got: {:?}",
+            error.messages()
+        );
+    }
+
+    #[test]
+    fn rejects_entity_relationship_with_relationship_referencing_undeclared_entity() {
+        let mut document = sample_document();
+        document.sections[0].diagram = Some(Diagram::EntityRelationship {
+            entities: vec![
+                Entity {
+                    name: "User".into(),
+                    fields: vec![Field {
+                        name: "id".into(),
+                        field_type: "uuid".into(),
+                        note: None,
+                    }],
+                },
+                Entity {
+                    name: "Order".into(),
+                    fields: vec![Field {
+                        name: "id".into(),
+                        field_type: "uuid".into(),
+                        note: None,
+                    }],
+                },
+            ],
+            relationships: vec![Relationship {
+                from: "User".into(),
+                to: "Invoice".into(),
+                cardinality: Cardinality::OneToMany,
+                label: None,
+            }],
+        });
+
+        let error = document.validate().expect_err("payload should be invalid");
+        let error = error
+            .downcast_ref::<ValidationError>()
+            .expect("validation error should downcast");
+
+        assert!(
+            error
+                .messages()
+                .iter()
+                .any(|m| m.contains("references undeclared entity \"Invoice\"")),
+            "expected undeclared-entity error, got: {:?}",
+            error.messages()
+        );
+    }
+
+    #[test]
+    fn rejects_entity_relationship_field_with_empty_name_or_type() {
+        let mut document = sample_document();
+        document.sections[0].diagram = Some(Diagram::EntityRelationship {
+            entities: vec![
+                Entity {
+                    name: "User".into(),
+                    fields: vec![Field {
+                        name: "".into(),
+                        field_type: "uuid".into(),
+                        note: None,
+                    }],
+                },
+                Entity {
+                    name: "Order".into(),
+                    fields: vec![Field {
+                        name: "id".into(),
+                        field_type: "  ".into(),
+                        note: None,
+                    }],
+                },
+            ],
+            relationships: vec![Relationship {
+                from: "User".into(),
+                to: "Order".into(),
+                cardinality: Cardinality::OneToMany,
+                label: None,
+            }],
+        });
+
+        let error = document.validate().expect_err("payload should be invalid");
+        let error = error
+            .downcast_ref::<ValidationError>()
+            .expect("validation error should downcast");
+
+        assert!(
+            error
+                .messages()
+                .iter()
+                .any(|m| m.contains("entities[0].fields[0].name")),
+            "expected empty-field-name error, got: {:?}",
+            error.messages()
+        );
+        assert!(
+            error
+                .messages()
+                .iter()
+                .any(|m| m.contains("entities[1].fields[0].type")),
+            "expected empty-field-type error, got: {:?}",
             error.messages()
         );
     }

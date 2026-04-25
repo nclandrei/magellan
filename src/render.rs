@@ -4,7 +4,10 @@ use std::fmt::Write;
 use anyhow::{Context, Result};
 use schemars::schema_for;
 
-use crate::model::{BeforeAfterDiagram, Diagram, Document, Edge, Section, TimelineEvent, TreeNode};
+use crate::model::{
+    BeforeAfterDiagram, Cardinality, Diagram, Document, Edge, Entity, Relationship, Section,
+    TimelineEvent, TreeNode,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OutputFormat {
@@ -479,7 +482,7 @@ fn html_style() -> &'static str {
     .content {
       margin-left: var(--sidebar-width);
       flex: 1;
-      max-width: 820px;
+      max-width: 1080px;
       padding: 32px 36px 72px;
     }
     .hero {
@@ -569,7 +572,7 @@ fn html_style() -> &'static str {
       color: var(--ink);
       border-color: var(--accent);
     }
-    .section-body {
+    .section-body > p {
       max-width: 64ch;
     }
     .section-body p:last-child {
@@ -589,6 +592,8 @@ fn html_style() -> &'static str {
       background: var(--surface);
       padding: 16px;
       cursor: zoom-in;
+      width: 100%;
+      max-width: none;
     }
     .lightbox[hidden] {
       display: none;
@@ -650,6 +655,7 @@ fn html_style() -> &'static str {
       display: block;
       width: 100%;
       height: auto;
+      min-height: 260px;
     }
     details {
       margin-top: 16px;
@@ -832,6 +838,10 @@ fn render_svg_diagram(index: usize, diagram: &Diagram) -> String {
         Diagram::DependencyTree { root, children } => {
             render_dependency_tree_svg(&diagram_id, root, children)
         }
+        Diagram::EntityRelationship {
+            entities,
+            relationships,
+        } => render_entity_relationship_svg(&diagram_id, entities, relationships),
     }
 }
 
@@ -1614,6 +1624,57 @@ fn svg_shell(
       font-size: 12px;
       fill: var(--diagram-text-muted, #a09890);
     }}
+    .er-entity {{
+      fill: var(--diagram-node-fill, #1b1a18);
+      stroke: var(--diagram-stroke, rgba(160, 152, 144, 0.55));
+      stroke-width: 1.2;
+    }}
+    .er-entity-header {{
+      fill: var(--diagram-lane, rgba(255, 255, 255, 0.08));
+      stroke: var(--diagram-stroke, rgba(160, 152, 144, 0.55));
+      stroke-width: 0;
+    }}
+    .er-entity-title {{
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 13px;
+      font-weight: 700;
+      fill: var(--diagram-text, #d9d5d0);
+    }}
+    .er-field {{
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      font-weight: 600;
+      fill: var(--diagram-text, #d9d5d0);
+    }}
+    .er-field-type {{
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      fill: var(--diagram-text-muted, #a09890);
+    }}
+    .er-field-key {{
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      fill: var(--accent-strong, #c0b8b0);
+    }}
+    .er-field-note {{
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      fill: var(--diagram-text-muted, #a09890);
+    }}
+    .er-relationship-label-bg {{
+      fill: var(--surface, #1b1a18);
+      stroke: var(--diagram-stroke, rgba(160, 152, 144, 0.6));
+      stroke-width: 1;
+    }}
+    .er-relationship-label {{
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      fill: var(--diagram-text, #d9d5d0);
+    }}
   </style>
   <defs>
     <marker id=\"{marker_id}\" viewBox=\"0 0 10 10\" refX=\"8\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto-start-reverse\">
@@ -1869,6 +1930,7 @@ fn diagram_title(diagram: &Diagram) -> &'static str {
         Diagram::StateMachine { .. } => "State machine",
         Diagram::Table { .. } => "Table",
         Diagram::DependencyTree { .. } => "Dependency tree",
+        Diagram::EntityRelationship { .. } => "Entity relationship",
     }
 }
 
@@ -1952,6 +2014,10 @@ fn render_ascii_diagram(diagram: &Diagram) -> String {
             render_ascii_tree_children(&mut output, children, "");
             output.trim_end().to_owned()
         }
+        Diagram::EntityRelationship {
+            entities,
+            relationships,
+        } => render_ascii_entity_relationship(entities, relationships),
     }
 }
 
@@ -1969,6 +2035,346 @@ fn render_ascii_tree_children(output: &mut String, children: &[TreeNode], prefix
             render_ascii_tree_children(output, &child.children, &child_prefix);
         }
     }
+}
+
+fn render_ascii_entity_relationship(entities: &[Entity], relationships: &[Relationship]) -> String {
+    let mut output = String::from("Entity relationship\n");
+    for entity in entities {
+        writeln!(&mut output, "  [{}]", entity.name).unwrap();
+        for field in &entity.fields {
+            match &field.note {
+                Some(note) => writeln!(
+                    &mut output,
+                    "    - {} : {} ({})",
+                    field.name, field.field_type, note
+                )
+                .unwrap(),
+                None => {
+                    writeln!(&mut output, "    - {} : {}", field.name, field.field_type).unwrap()
+                }
+            }
+        }
+    }
+    if !relationships.is_empty() {
+        output.push('\n');
+        for relationship in relationships {
+            let connector = ascii_cardinality_connector(relationship.cardinality);
+            match &relationship.label {
+                Some(label) => writeln!(
+                    &mut output,
+                    "  {} {} {} : {}",
+                    relationship.from, connector, relationship.to, label
+                )
+                .unwrap(),
+                None => writeln!(
+                    &mut output,
+                    "  {} {} {}",
+                    relationship.from, connector, relationship.to
+                )
+                .unwrap(),
+            }
+        }
+    }
+    output.trim_end().to_owned()
+}
+
+fn ascii_cardinality_connector(cardinality: Cardinality) -> &'static str {
+    match cardinality {
+        Cardinality::OneToOne => "||--||",
+        Cardinality::OneToMany => "||--o{",
+        Cardinality::ManyToOne => "}o--||",
+        Cardinality::ManyToMany => "}o--o{",
+    }
+}
+
+fn render_mermaid_entity_relationship(
+    entities: &[Entity],
+    relationships: &[Relationship],
+) -> String {
+    let mut output = String::from("erDiagram\n");
+    for relationship in relationships {
+        let connector = mermaid_cardinality_connector(relationship.cardinality);
+        let label = relationship
+            .label
+            .as_deref()
+            .map(escape_mermaid_text)
+            .unwrap_or_else(|| String::from("relates"));
+        writeln!(
+            &mut output,
+            "    {} {connector} {} : {label}",
+            mermaid_entity_id(&relationship.from),
+            mermaid_entity_id(&relationship.to),
+        )
+        .unwrap();
+    }
+    for entity in entities {
+        writeln!(&mut output, "    {} {{", mermaid_entity_id(&entity.name)).unwrap();
+        for field in &entity.fields {
+            let field_type = sanitize_node(&field.field_type);
+            let field_name = sanitize_node(&field.name);
+            match &field.note {
+                Some(note) => writeln!(
+                    &mut output,
+                    "        {field_type} {field_name} {}",
+                    mermaid_field_note(note)
+                )
+                .unwrap(),
+                None => writeln!(&mut output, "        {field_type} {field_name}").unwrap(),
+            }
+        }
+        writeln!(&mut output, "    }}").unwrap();
+    }
+    output.trim_end().to_owned()
+}
+
+fn mermaid_cardinality_connector(cardinality: Cardinality) -> &'static str {
+    match cardinality {
+        Cardinality::OneToOne => "||--||",
+        Cardinality::OneToMany => "||--o{",
+        Cardinality::ManyToOne => "}o--||",
+        Cardinality::ManyToMany => "}o--o{",
+    }
+}
+
+fn mermaid_entity_id(name: &str) -> String {
+    sanitize_node(name).to_uppercase()
+}
+
+fn mermaid_field_note(note: &str) -> String {
+    let upper = note.to_uppercase();
+    if upper == "PK" || upper == "FK" || upper == "UK" {
+        upper
+    } else {
+        format!("\"{}\"", escape_mermaid_text(note))
+    }
+}
+
+fn render_entity_relationship_svg(
+    id: &str,
+    entities: &[Entity],
+    relationships: &[Relationship],
+) -> String {
+    let padding = 24;
+    let header_height = 32;
+    let row_height = 22;
+    let entity_gap_x = 40;
+    let entity_gap_y = 32;
+    let columns: usize = if entities.len() <= 2 {
+        entities.len()
+    } else {
+        2
+    }
+    .max(1);
+    let rows = entities.len().div_ceil(columns).max(1);
+    let marker_id = format!("{id}-arrow");
+
+    // Compute a single entity box width that fits the widest header and field row.
+    let mut max_chars: usize = 0;
+    for entity in entities {
+        max_chars = max_chars.max(entity.name.len());
+        for field in &entity.fields {
+            let mut row_chars = field.name.len() + field.field_type.len() + 4; // " : " separator + padding
+            if let Some(note) = &field.note {
+                row_chars += note.len() + 3; // " (note)"
+            }
+            max_chars = max_chars.max(row_chars);
+        }
+    }
+    let entity_width: i32 = ((max_chars as i32) * 8 + 32).clamp(180, 260);
+    let entity_height =
+        |entity: &Entity| -> i32 { header_height + entity.fields.len() as i32 * row_height + 8 };
+    let max_entity_height: i32 = entities.iter().map(entity_height).max().unwrap_or(64);
+
+    let width = padding * 2
+        + columns as i32 * entity_width
+        + (columns.saturating_sub(1)) as i32 * entity_gap_x;
+    let height = padding * 2
+        + rows as i32 * max_entity_height
+        + (rows.saturating_sub(1)) as i32 * entity_gap_y;
+
+    let positions: Vec<(&str, (i32, i32))> = entities
+        .iter()
+        .enumerate()
+        .map(|(index, entity)| {
+            let row = index / columns;
+            let col = index % columns;
+            let x = padding + col as i32 * (entity_width + entity_gap_x);
+            let y = padding + row as i32 * (max_entity_height + entity_gap_y);
+            (entity.name.as_str(), (x, y))
+        })
+        .collect();
+
+    let mut body = String::new();
+
+    // Pass 1: connector lines, clipped to entity-box edges so they don't disappear
+    // behind the rects we paint next.
+    let mut endpoints: Vec<(i32, i32, i32, i32)> = Vec::with_capacity(relationships.len());
+    for relationship in relationships {
+        let Some((from_origin, from_h)) = entities
+            .iter()
+            .zip(positions.iter())
+            .find(|(entity, _)| entity.name == relationship.from)
+            .map(|(entity, (_, p))| (*p, entity_height(entity)))
+        else {
+            endpoints.push((0, 0, 0, 0));
+            continue;
+        };
+        let Some((to_origin, to_h)) = entities
+            .iter()
+            .zip(positions.iter())
+            .find(|(entity, _)| entity.name == relationship.to)
+            .map(|(entity, (_, p))| (*p, entity_height(entity)))
+        else {
+            endpoints.push((0, 0, 0, 0));
+            continue;
+        };
+
+        let from_cx = from_origin.0 + entity_width / 2;
+        let from_cy = from_origin.1 + from_h / 2;
+        let to_cx = to_origin.0 + entity_width / 2;
+        let to_cy = to_origin.1 + to_h / 2;
+
+        let (start_x, start_y) =
+            clip_to_rect_edge(from_cx, from_cy, entity_width, from_h, to_cx, to_cy);
+        let (end_x, end_y) = clip_to_rect_edge(to_cx, to_cy, entity_width, to_h, from_cx, from_cy);
+
+        write!(
+            &mut body,
+            "<line class=\"connector\" x1=\"{start_x}\" y1=\"{start_y}\" x2=\"{end_x}\" y2=\"{end_y}\" marker-end=\"url(#{marker_id})\"/>"
+        )
+        .unwrap();
+        endpoints.push((start_x, start_y, end_x, end_y));
+    }
+
+    // Pass 2: entity boxes and their fields. These paint over the connector lines.
+    for (entity, (x, y)) in entities.iter().zip(positions.iter().map(|(_, p)| *p)) {
+        let h = entity_height(entity);
+
+        write!(
+            &mut body,
+            "<rect class=\"er-entity\" x=\"{x}\" y=\"{y}\" width=\"{entity_width}\" height=\"{h}\" rx=\"8\" ry=\"8\"/>"
+        )
+        .unwrap();
+        write!(
+            &mut body,
+            "<rect class=\"er-entity-header\" x=\"{x}\" y=\"{y}\" width=\"{entity_width}\" height=\"{header_height}\" rx=\"8\" ry=\"8\"/>"
+        )
+        .unwrap();
+        write_multiline_svg_text(
+            &mut body,
+            x + entity_width / 2,
+            y + 20,
+            std::slice::from_ref(&entity.name),
+            "middle",
+            "er-entity-title",
+        );
+
+        let field_x_left = x + 12;
+        let field_x_right = x + entity_width - 12;
+        for (field_index, field) in entity.fields.iter().enumerate() {
+            let row_y = y + header_height + (field_index as i32) * row_height + 4;
+            let baseline = row_y + 14;
+
+            if field_index > 0 {
+                let sep_y = row_y;
+                write!(
+                    &mut body,
+                    "<line class=\"lane\" x1=\"{x}\" y1=\"{sep_y}\" x2=\"{}\" y2=\"{sep_y}\" style=\"stroke-dasharray:none;stroke-width:0.6\"/>",
+                    x + entity_width
+                )
+                .unwrap();
+            }
+
+            if let Some(note) = &field.note {
+                let upper = note.to_uppercase();
+                let class = if upper == "PK" || upper == "FK" || upper == "UK" {
+                    "er-field-key"
+                } else {
+                    "er-field-note"
+                };
+                write!(
+                    &mut body,
+                    "<text class=\"{class}\" x=\"{field_x_right}\" y=\"{baseline}\" text-anchor=\"end\">{}</text>",
+                    escape_html(note)
+                )
+                .unwrap();
+            }
+
+            write!(
+                &mut body,
+                "<text class=\"er-field\" x=\"{field_x_left}\" y=\"{baseline}\" text-anchor=\"start\">{}</text>",
+                escape_html(&field.name)
+            )
+            .unwrap();
+            write!(
+                &mut body,
+                "<text class=\"er-field-type\" x=\"{}\" y=\"{baseline}\" text-anchor=\"start\">{}</text>",
+                x + entity_width / 2 - 4,
+                escape_html(&field.field_type)
+            )
+            .unwrap();
+        }
+    }
+
+    // Pass 3: relationship labels on top of everything else, sitting on a backing
+    // pill so they stay readable when the line grazes another entity.
+    for (relationship, (sx, sy, ex, ey)) in relationships.iter().zip(endpoints.iter()) {
+        let Some(label) = relationship.label.as_ref() else {
+            continue;
+        };
+        let mid_x = (sx + ex) / 2;
+        let mid_y = (sy + ey) / 2;
+        let pill_width = (label.chars().count() as i32 * 7).clamp(48, 220);
+        let pill_height = 20;
+        let pill_x = mid_x - pill_width / 2;
+        let pill_y = mid_y - pill_height / 2;
+        write!(
+            &mut body,
+            "<rect class=\"er-relationship-label-bg\" x=\"{pill_x}\" y=\"{pill_y}\" width=\"{pill_width}\" height=\"{pill_height}\" rx=\"10\" ry=\"10\"/>"
+        )
+        .unwrap();
+        write!(
+            &mut body,
+            "<text class=\"er-relationship-label\" x=\"{mid_x}\" y=\"{}\" text-anchor=\"middle\">{}</text>",
+            mid_y + 4,
+            escape_html(label)
+        )
+        .unwrap();
+    }
+
+    svg_shell(
+        id,
+        width.max(360),
+        height.max(160),
+        &marker_id,
+        "Entity relationship",
+        &body,
+    )
+}
+
+fn clip_to_rect_edge(cx: i32, cy: i32, w: i32, h: i32, tx: i32, ty: i32) -> (i32, i32) {
+    let dx = (tx - cx) as f64;
+    let dy = (ty - cy) as f64;
+    if dx.abs() < 0.5 && dy.abs() < 0.5 {
+        return (cx, cy);
+    }
+    let half_w = w as f64 / 2.0;
+    let half_h = h as f64 / 2.0;
+    let scale_x = if dx.abs() < 1e-6 {
+        f64::INFINITY
+    } else {
+        half_w / dx.abs()
+    };
+    let scale_y = if dy.abs() < 1e-6 {
+        f64::INFINITY
+    } else {
+        half_h / dy.abs()
+    };
+    let scale = scale_x.min(scale_y);
+    (
+        (cx as f64 + dx * scale).round() as i32,
+        (cy as f64 + dy * scale).round() as i32,
+    )
 }
 
 fn render_ascii_edges(title: &str, edges: &[Edge]) -> String {
@@ -2168,6 +2574,10 @@ fn render_mermaid_diagram(diagram: &Diagram) -> String {
             // future consumers that still funnel table diagrams through mermaid.
             render_markdown_table(headers, rows)
         }
+        Diagram::EntityRelationship {
+            entities,
+            relationships,
+        } => render_mermaid_entity_relationship(entities, relationships),
     }
 }
 
@@ -2199,7 +2609,58 @@ fn escape_html(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{Diagram, Document, Edge, Section, TreeNode, Verification};
+    use crate::model::{
+        Cardinality, Diagram, Document, Edge, Entity, Field, Relationship, Section, TreeNode,
+        Verification,
+    };
+
+    fn er_diagram_sample() -> Diagram {
+        Diagram::EntityRelationship {
+            entities: vec![
+                Entity {
+                    name: "User".into(),
+                    fields: vec![
+                        Field {
+                            name: "id".into(),
+                            field_type: "uuid".into(),
+                            note: Some("PK".into()),
+                        },
+                        Field {
+                            name: "email".into(),
+                            field_type: "string".into(),
+                            note: None,
+                        },
+                    ],
+                },
+                Entity {
+                    name: "Order".into(),
+                    fields: vec![
+                        Field {
+                            name: "id".into(),
+                            field_type: "uuid".into(),
+                            note: Some("PK".into()),
+                        },
+                        Field {
+                            name: "user_id".into(),
+                            field_type: "uuid".into(),
+                            note: Some("FK".into()),
+                        },
+                        Field {
+                            name: "total".into(),
+                            field_type: "decimal".into(),
+                            note: None,
+                        },
+                    ],
+                },
+            ],
+            relationships: vec![Relationship {
+                from: "User".into(),
+                to: "Order".into(),
+                cardinality: Cardinality::OneToMany,
+                label: Some("places".into()),
+            }],
+        }
+    }
     use crate::{ExamplePreset, example_document};
 
     fn sample_document() -> Document {
@@ -2662,6 +3123,199 @@ mod tests {
         let html = render_document(&doc, OutputFormat::Html);
         assert!(html.contains("Dependency tree"));
         assert!(html.contains("<svg viewBox="));
+    }
+
+    #[test]
+    fn html_inline_diagrams_break_out_of_paragraph_reading_width() {
+        let rendered = render_document(&sample_document(), OutputFormat::Html);
+
+        // Prose paragraphs should still cap around 64 characters for readability.
+        assert!(
+            rendered.contains(".section-body > p {")
+                && rendered.contains(".section-body > p {\n      max-width: 64ch;"),
+            "section-body paragraphs (not the whole body) should cap at 64ch for readable prose"
+        );
+        // The unscoped `.section-body { max-width: 64ch }` rule must be gone so that
+        // diagrams can use the full content width.
+        assert!(
+            !rendered.contains(".section-body {\n      max-width: 64ch;"),
+            "section-body itself must not cap width — that squeezes inline diagrams"
+        );
+        // Diagrams should explicitly opt out of the prose width and span the column.
+        assert!(
+            rendered.contains(".diagram {")
+                && rendered.contains("max-width: none;")
+                && rendered.contains("width: 100%;"),
+            "the .diagram block should declare width: 100% and max-width: none so it can grow"
+        );
+        // Give the report column more horizontal room so the diagrams have space to breathe.
+        assert!(
+            rendered.contains("max-width: 1080px"),
+            ".content max-width should grow to 1080px so diagrams render larger"
+        );
+        // Inline SVGs need a comfortable minimum rendered height so text inside them
+        // stays readable and stops overflowing on small viewBoxes.
+        assert!(
+            rendered.contains(".diagram svg {") && rendered.contains("min-height: 260px;"),
+            "diagram SVGs should get a min-height so inline text stays legible"
+        );
+    }
+
+    #[test]
+    fn entity_relationship_paints_relationship_labels_after_entity_rects() {
+        let doc = doc_with_diagram("ER paint order", er_diagram_sample());
+        let html = render_document(&doc, OutputFormat::Html);
+
+        let last_entity_rect = html
+            .rfind("class=\"er-entity\"")
+            .expect("ER SVG should declare entity rects");
+        let label_marker = "class=\"er-relationship-label\"";
+        let first_label = html
+            .find(label_marker)
+            .expect("ER SVG should declare a relationship-label class");
+
+        assert!(
+            first_label > last_entity_rect,
+            "relationship labels must paint after entity rects so they aren't occluded \
+             (first label at {first_label}, last entity rect at {last_entity_rect})"
+        );
+
+        // The label tag should sit on top of a backing pill so it stays readable when
+        // the connector line crosses or grazes another entity.
+        assert!(
+            html.contains("class=\"er-relationship-label-bg\""),
+            "relationship labels should have a background pill"
+        );
+    }
+
+    #[test]
+    fn entity_relationship_renders_html_svg_with_entities_and_relationships() {
+        let doc = doc_with_diagram("ER HTML rendering", er_diagram_sample());
+
+        let html = render_document(&doc, OutputFormat::Html);
+
+        assert!(
+            html.contains("Entity relationship"),
+            "HTML output should label the diagram type, got truncated:\n{}",
+            html.chars().take(400).collect::<String>()
+        );
+        assert!(
+            html.contains("<svg viewBox="),
+            "HTML output should embed an SVG"
+        );
+        assert!(
+            html.contains("class=\"er-entity\""),
+            "ER SVG should expose dedicated entity styling"
+        );
+        assert!(
+            html.contains("class=\"er-entity-header\""),
+            "ER SVG should mark the entity title row"
+        );
+        assert!(
+            html.contains("class=\"er-field\""),
+            "ER SVG should mark field rows"
+        );
+        assert!(
+            html.contains(">User<") && html.contains(">Order<"),
+            "ER SVG should include entity names as text"
+        );
+        assert!(
+            html.contains(">id<") && html.contains(">email<") && html.contains(">user_id<"),
+            "ER SVG should include field names as text"
+        );
+        assert!(
+            html.contains(">uuid<") && html.contains(">decimal<"),
+            "ER SVG should include field types as text"
+        );
+        assert!(
+            html.contains(">PK<") && html.contains(">FK<"),
+            "ER SVG should render note markers"
+        );
+        // ASCII fallback should still be present in the figure
+        assert!(
+            html.contains("ASCII fallback"),
+            "ER figure should keep an ASCII fallback section"
+        );
+        assert!(
+            html.contains("User ||--o{ Order : places"),
+            "ASCII fallback should include the relationship line"
+        );
+    }
+
+    #[test]
+    fn entity_relationship_renders_mermaid_block_in_markdown() {
+        let doc = doc_with_diagram("ER mermaid rendering", er_diagram_sample());
+
+        let markdown = render_document(&doc, OutputFormat::Markdown);
+
+        assert!(
+            markdown.contains("```mermaid"),
+            "ER markdown output should be wrapped in a mermaid fence, got:\n{markdown}"
+        );
+        assert!(
+            markdown.contains("erDiagram"),
+            "mermaid block should declare an erDiagram, got:\n{markdown}"
+        );
+        assert!(
+            markdown.contains("USER ||--o{ ORDER : places"),
+            "mermaid block should encode the relationship with cardinality, got:\n{markdown}"
+        );
+        assert!(
+            markdown.contains("USER {"),
+            "mermaid block should open a USER entity definition, got:\n{markdown}"
+        );
+        assert!(
+            markdown.contains("uuid id PK"),
+            "mermaid block should encode field type, name, and note, got:\n{markdown}"
+        );
+        assert!(
+            markdown.contains("string email"),
+            "mermaid block should encode notes-less fields, got:\n{markdown}"
+        );
+        assert!(
+            markdown.contains("ORDER {"),
+            "mermaid block should open an ORDER entity definition, got:\n{markdown}"
+        );
+        assert!(
+            markdown.contains("uuid user_id FK"),
+            "mermaid block should encode foreign-key fields, got:\n{markdown}"
+        );
+    }
+
+    #[test]
+    fn entity_relationship_renders_ascii_with_entities_fields_and_relationships() {
+        let doc = doc_with_diagram("ER ASCII rendering", er_diagram_sample());
+
+        let terminal = render_document(&doc, OutputFormat::Terminal);
+
+        assert!(
+            terminal.contains("Entity relationship"),
+            "ASCII output should label the diagram type, got:\n{terminal}"
+        );
+        assert!(
+            terminal.contains("[User]"),
+            "ASCII output should show the User entity header, got:\n{terminal}"
+        );
+        assert!(
+            terminal.contains("[Order]"),
+            "ASCII output should show the Order entity header, got:\n{terminal}"
+        );
+        assert!(
+            terminal.contains("id : uuid (PK)"),
+            "ASCII output should show field name, type, and note, got:\n{terminal}"
+        );
+        assert!(
+            terminal.contains("email : string"),
+            "ASCII output should show fields without notes, got:\n{terminal}"
+        );
+        assert!(
+            terminal.contains("user_id : uuid (FK)"),
+            "ASCII output should show foreign key fields, got:\n{terminal}"
+        );
+        assert!(
+            terminal.contains("User ||--o{ Order : places"),
+            "ASCII output should show relationship with cardinality and label, got:\n{terminal}"
+        );
     }
 
     #[test]

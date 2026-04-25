@@ -58,6 +58,7 @@ Diagram picking:
   state_machine    States connected by labeled transitions
   table            Rows and columns for comparisons or field mappings
   dependency_tree  Hierarchical parent-child relationships
+  entity_relationship  Data model: entities with fields and labeled relationships
 
 Reference outputs:
   examples/session-walkthrough.json
@@ -135,6 +136,7 @@ Diagram guide:
   state_machine    States connected by labeled transitions
   table            Rows and columns for comparisons or field mappings
   dependency_tree  Hierarchical parent-child relationships
+  entity_relationship  Data model: entities with fields and labeled relationships
 
 Examples:
   magellan render --input /tmp/magellan.json --format html --open --markdown-out /tmp/magellan.md
@@ -825,6 +827,9 @@ fn prompt_diagram_guidance(goal: CliPromptGoal, focuses: &[CliPromptFocus]) -> S
         ),
         String::from(
             "- use `dependency_tree` for module dependencies, call trees, or hierarchical relationships",
+        ),
+        String::from(
+            "- use `entity_relationship` for data models: tables, ORM entities, or schemas where field-level structure and cardinality matter",
         ),
         String::from(
             "- prefer at most one diagram per section and skip diagrams when a short paragraph is clearer",

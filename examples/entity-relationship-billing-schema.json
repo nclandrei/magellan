@@ -1,0 +1,73 @@
+{
+  "title": "Entity relationship: billing schema after the customer split",
+  "summary": [
+    "We split the monolithic `Account` row into `Customer`, `Subscription`, and `Invoice` so that billing state can change without rewriting account profile data.",
+    "The new schema also moves invoice line items into a dedicated table so historical invoices stay immutable while subscriptions evolve."
+  ],
+  "sections": [
+    {
+      "title": "Billing entities",
+      "text": [
+        "Each `Customer` now owns one or more `Subscription` rows, and each subscription bills one or more `Invoice` rows over time.",
+        "Foreign keys point upstream so a snapshot of an invoice is enough to reconstruct who was billed and which plan it covered."
+      ],
+      "diagram": {
+        "type": "entity_relationship",
+        "entities": [
+          {
+            "name": "Customer",
+            "fields": [
+              { "name": "id", "type": "uuid", "note": "PK" },
+              { "name": "email", "type": "string" },
+              { "name": "country", "type": "string" }
+            ]
+          },
+          {
+            "name": "Subscription",
+            "fields": [
+              { "name": "id", "type": "uuid", "note": "PK" },
+              { "name": "customer_id", "type": "uuid", "note": "FK" },
+              { "name": "plan", "type": "string" },
+              { "name": "status", "type": "enum" }
+            ]
+          },
+          {
+            "name": "Invoice",
+            "fields": [
+              { "name": "id", "type": "uuid", "note": "PK" },
+              { "name": "subscription_id", "type": "uuid", "note": "FK" },
+              { "name": "issued_at", "type": "timestamp" },
+              { "name": "total_cents", "type": "int" }
+            ]
+          }
+        ],
+        "relationships": [
+          {
+            "from": "Customer",
+            "to": "Subscription",
+            "cardinality": "one_to_many",
+            "label": "owns"
+          },
+          {
+            "from": "Subscription",
+            "to": "Invoice",
+            "cardinality": "one_to_many",
+            "label": "bills"
+          }
+        ]
+      }
+    },
+    {
+      "title": "Why the split matters",
+      "text": [
+        "Older code mutated billing state on the `Account` row, which made it hard to keep historical invoices accurate when plans changed.",
+        "Now each subscription change creates a new row instead of overwriting state, so invoices keep referencing the subscription that was in effect when they were issued."
+      ]
+    }
+  ],
+  "verification": {
+    "text": [
+      "Migration tests cover backfilling existing accounts into the new tables and replaying a sample of historical invoices."
+    ]
+  }
+}
