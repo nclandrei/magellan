@@ -2157,8 +2157,10 @@ fn render_entity_relationship_svg(
     let padding = 24;
     let header_height = 32;
     let row_height = 22;
-    let entity_gap_x = 40;
-    let entity_gap_y = 32;
+    // Wide enough that the relationship label pill (min width 48) fits in the
+    // gap without nibbling into the rounded entity corners on either side.
+    let entity_gap_x = 72;
+    let entity_gap_y = 48;
     let columns: usize = if entities.len() <= 2 {
         entities.len()
     } else {
@@ -2168,19 +2170,38 @@ fn render_entity_relationship_svg(
     let rows = entities.len().div_ceil(columns).max(1);
     let marker_id = format!("{id}-arrow");
 
-    // Compute a single entity box width that fits the widest header and field row.
-    let mut max_chars: usize = 0;
+    // Size the field name and type columns from their actual longest entries so
+    // long names like `subscription_id` don't overflow into the type column.
+    let char_w: i32 = 8;
+    let inner_pad: i32 = 12;
+    let col_gap: i32 = 16;
+    let key_col_w: i32 = 24;
+
+    let mut max_name_chars: usize = 0;
+    let mut max_type_chars: usize = 0;
+    let mut max_header_chars: usize = 0;
+    let mut has_key_column = false;
     for entity in entities {
-        max_chars = max_chars.max(entity.name.len());
+        max_header_chars = max_header_chars.max(entity.name.len());
         for field in &entity.fields {
-            let mut row_chars = field.name.len() + field.field_type.len() + 4; // " : " separator + padding
-            if let Some(note) = &field.note {
-                row_chars += note.len() + 3; // " (note)"
+            max_name_chars = max_name_chars.max(field.name.len());
+            max_type_chars = max_type_chars.max(field.field_type.len());
+            if field.note.is_some() {
+                has_key_column = true;
             }
-            max_chars = max_chars.max(row_chars);
         }
     }
-    let entity_width: i32 = ((max_chars as i32) * 8 + 32).clamp(180, 260);
+    let name_col_w = max_name_chars as i32 * char_w;
+    let type_col_w = max_type_chars as i32 * char_w;
+    let key_section = if has_key_column {
+        col_gap + key_col_w
+    } else {
+        0
+    };
+    let body_w = inner_pad + name_col_w + col_gap + type_col_w + key_section + inner_pad;
+    let header_w = max_header_chars as i32 * char_w + 32;
+    let entity_width: i32 = body_w.max(header_w).max(180);
+    let type_col_x_offset = inner_pad + name_col_w + col_gap;
     let entity_height =
         |entity: &Entity| -> i32 { header_height + entity.fields.len() as i32 * row_height + 8 };
     let max_entity_height: i32 = entities.iter().map(entity_height).max().unwrap_or(64);
@@ -2309,7 +2330,7 @@ fn render_entity_relationship_svg(
             write!(
                 &mut body,
                 "<text class=\"er-field-type\" x=\"{}\" y=\"{baseline}\" text-anchor=\"start\">{}</text>",
-                x + entity_width / 2 - 4,
+                x + type_col_x_offset,
                 escape_html(&field.field_type)
             )
             .unwrap();
