@@ -1663,6 +1663,18 @@ fn svg_shell(
       font-size: 11px;
       fill: var(--diagram-text-muted, #a09890);
     }}
+    .er-relationship-label-bg {{
+      fill: var(--surface, #1b1a18);
+      stroke: var(--diagram-stroke, rgba(160, 152, 144, 0.6));
+      stroke-width: 1;
+    }}
+    .er-relationship-label {{
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      fill: var(--diagram-text, #d9d5d0);
+    }}
   </style>
   <defs>
     <marker id=\"{marker_id}\" viewBox=\"0 0 10 10\" refX=\"8\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto-start-reverse\">
@@ -2194,67 +2206,60 @@ fn render_entity_relationship_svg(
 
     let mut body = String::new();
 
-    // Draw relationship lines first so entity boxes paint on top.
+    // Pass 1: connector lines, clipped to entity-box edges so they don't disappear
+    // behind the rects we paint next.
+    let mut endpoints: Vec<(i32, i32, i32, i32)> = Vec::with_capacity(relationships.len());
     for relationship in relationships {
-        let Some((from_x, from_y)) = positions
+        let Some((from_origin, from_h)) = entities
             .iter()
-            .find(|(name, _)| *name == relationship.from.as_str())
-            .map(|(_, p)| *p)
+            .zip(positions.iter())
+            .find(|(entity, _)| entity.name == relationship.from)
+            .map(|(entity, (_, p))| (*p, entity_height(entity)))
         else {
+            endpoints.push((0, 0, 0, 0));
             continue;
         };
-        let Some((to_x, to_y)) = positions
+        let Some((to_origin, to_h)) = entities
             .iter()
-            .find(|(name, _)| *name == relationship.to.as_str())
-            .map(|(_, p)| *p)
+            .zip(positions.iter())
+            .find(|(entity, _)| entity.name == relationship.to)
+            .map(|(entity, (_, p))| (*p, entity_height(entity)))
         else {
+            endpoints.push((0, 0, 0, 0));
             continue;
         };
-        let start_x = from_x + entity_width / 2;
-        let start_y = from_y + max_entity_height / 2;
-        let end_x = to_x + entity_width / 2;
-        let end_y = to_y + max_entity_height / 2;
+
+        let from_cx = from_origin.0 + entity_width / 2;
+        let from_cy = from_origin.1 + from_h / 2;
+        let to_cx = to_origin.0 + entity_width / 2;
+        let to_cy = to_origin.1 + to_h / 2;
+
+        let (start_x, start_y) =
+            clip_to_rect_edge(from_cx, from_cy, entity_width, from_h, to_cx, to_cy);
+        let (end_x, end_y) = clip_to_rect_edge(to_cx, to_cy, entity_width, to_h, from_cx, from_cy);
+
         write!(
             &mut body,
             "<line class=\"connector\" x1=\"{start_x}\" y1=\"{start_y}\" x2=\"{end_x}\" y2=\"{end_y}\" marker-end=\"url(#{marker_id})\"/>"
         )
         .unwrap();
-
-        let mid_x = (start_x + end_x) / 2;
-        let mid_y = (start_y + end_y) / 2;
-        let cardinality_glyph = ascii_cardinality_connector(relationship.cardinality);
-        let combined_label = match &relationship.label {
-            Some(label) => format!("{cardinality_glyph}  {label}"),
-            None => cardinality_glyph.to_string(),
-        };
-        write_multiline_svg_text(
-            &mut body,
-            mid_x,
-            mid_y - 6,
-            std::slice::from_ref(&combined_label),
-            "middle",
-            "edge-copy",
-        );
+        endpoints.push((start_x, start_y, end_x, end_y));
     }
 
+    // Pass 2: entity boxes and their fields. These paint over the connector lines.
     for (entity, (x, y)) in entities.iter().zip(positions.iter().map(|(_, p)| *p)) {
         let h = entity_height(entity);
 
-        // Outer box
         write!(
             &mut body,
             "<rect class=\"er-entity\" x=\"{x}\" y=\"{y}\" width=\"{entity_width}\" height=\"{h}\" rx=\"8\" ry=\"8\"/>"
         )
         .unwrap();
-
-        // Header band
         write!(
             &mut body,
             "<rect class=\"er-entity-header\" x=\"{x}\" y=\"{y}\" width=\"{entity_width}\" height=\"{header_height}\" rx=\"8\" ry=\"8\"/>"
         )
         .unwrap();
-
-        // Header text (entity name)
         write_multiline_svg_text(
             &mut body,
             x + entity_width / 2,
@@ -2264,14 +2269,12 @@ fn render_entity_relationship_svg(
             "er-entity-title",
         );
 
-        // Field rows
         let field_x_left = x + 12;
         let field_x_right = x + entity_width - 12;
         for (field_index, field) in entity.fields.iter().enumerate() {
             let row_y = y + header_height + (field_index as i32) * row_height + 4;
             let baseline = row_y + 14;
 
-            // Subtle separator above each field row except the first
             if field_index > 0 {
                 let sep_y = row_y;
                 write!(
@@ -2282,7 +2285,6 @@ fn render_entity_relationship_svg(
                 .unwrap();
             }
 
-            // Marker (PK/FK/etc.) on the right
             if let Some(note) = &field.note {
                 let upper = note.to_uppercase();
                 let class = if upper == "PK" || upper == "FK" || upper == "UK" {
@@ -2298,15 +2300,12 @@ fn render_entity_relationship_svg(
                 .unwrap();
             }
 
-            // Field name
             write!(
                 &mut body,
                 "<text class=\"er-field\" x=\"{field_x_left}\" y=\"{baseline}\" text-anchor=\"start\">{}</text>",
                 escape_html(&field.name)
             )
             .unwrap();
-
-            // Field type, slightly right of center, muted
             write!(
                 &mut body,
                 "<text class=\"er-field-type\" x=\"{}\" y=\"{baseline}\" text-anchor=\"start\">{}</text>",
@@ -2317,6 +2316,32 @@ fn render_entity_relationship_svg(
         }
     }
 
+    // Pass 3: relationship labels on top of everything else, sitting on a backing
+    // pill so they stay readable when the line grazes another entity.
+    for (relationship, (sx, sy, ex, ey)) in relationships.iter().zip(endpoints.iter()) {
+        let Some(label) = relationship.label.as_ref() else {
+            continue;
+        };
+        let mid_x = (sx + ex) / 2;
+        let mid_y = (sy + ey) / 2;
+        let pill_width = (label.chars().count() as i32 * 7).clamp(48, 220);
+        let pill_height = 20;
+        let pill_x = mid_x - pill_width / 2;
+        let pill_y = mid_y - pill_height / 2;
+        write!(
+            &mut body,
+            "<rect class=\"er-relationship-label-bg\" x=\"{pill_x}\" y=\"{pill_y}\" width=\"{pill_width}\" height=\"{pill_height}\" rx=\"10\" ry=\"10\"/>"
+        )
+        .unwrap();
+        write!(
+            &mut body,
+            "<text class=\"er-relationship-label\" x=\"{mid_x}\" y=\"{}\" text-anchor=\"middle\">{}</text>",
+            mid_y + 4,
+            escape_html(label)
+        )
+        .unwrap();
+    }
+
     svg_shell(
         id,
         width.max(360),
@@ -2324,6 +2349,31 @@ fn render_entity_relationship_svg(
         &marker_id,
         "Entity relationship",
         &body,
+    )
+}
+
+fn clip_to_rect_edge(cx: i32, cy: i32, w: i32, h: i32, tx: i32, ty: i32) -> (i32, i32) {
+    let dx = (tx - cx) as f64;
+    let dy = (ty - cy) as f64;
+    if dx.abs() < 0.5 && dy.abs() < 0.5 {
+        return (cx, cy);
+    }
+    let half_w = w as f64 / 2.0;
+    let half_h = h as f64 / 2.0;
+    let scale_x = if dx.abs() < 1e-6 {
+        f64::INFINITY
+    } else {
+        half_w / dx.abs()
+    };
+    let scale_y = if dy.abs() < 1e-6 {
+        f64::INFINITY
+    } else {
+        half_h / dy.abs()
+    };
+    let scale = scale_x.min(scale_y);
+    (
+        (cx as f64 + dx * scale).round() as i32,
+        (cy as f64 + dy * scale).round() as i32,
     )
 }
 
@@ -3108,6 +3158,33 @@ mod tests {
         assert!(
             rendered.contains(".diagram svg {") && rendered.contains("min-height: 260px;"),
             "diagram SVGs should get a min-height so inline text stays legible"
+        );
+    }
+
+    #[test]
+    fn entity_relationship_paints_relationship_labels_after_entity_rects() {
+        let doc = doc_with_diagram("ER paint order", er_diagram_sample());
+        let html = render_document(&doc, OutputFormat::Html);
+
+        let last_entity_rect = html
+            .rfind("class=\"er-entity\"")
+            .expect("ER SVG should declare entity rects");
+        let label_marker = "class=\"er-relationship-label\"";
+        let first_label = html
+            .find(label_marker)
+            .expect("ER SVG should declare a relationship-label class");
+
+        assert!(
+            first_label > last_entity_rect,
+            "relationship labels must paint after entity rects so they aren't occluded \
+             (first label at {first_label}, last entity rect at {last_entity_rect})"
+        );
+
+        // The label tag should sit on top of a backing pill so it stays readable when
+        // the connector line crosses or grazes another entity.
+        assert!(
+            html.contains("class=\"er-relationship-label-bg\""),
+            "relationship labels should have a background pill"
         );
     }
 
