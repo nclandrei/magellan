@@ -5,8 +5,8 @@ use anyhow::{Context, Result};
 use schemars::schema_for;
 
 use crate::model::{
-    BeforeAfterDiagram, Diagram, Document, Edge, Entity, Relationship, Section, TimelineEvent,
-    TreeNode,
+    BeforeAfterDiagram, Cardinality, Diagram, Document, Edge, Entity, Relationship, Section,
+    TimelineEvent, TreeNode,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1983,12 +1983,54 @@ fn render_ascii_tree_children(output: &mut String, children: &[TreeNode], prefix
     }
 }
 
-fn render_ascii_entity_relationship(
-    _entities: &[Entity],
-    _relationships: &[Relationship],
-) -> String {
-    // Stub: replaced by the TDD step that drives a real ASCII renderer.
-    String::from("ER diagram")
+fn render_ascii_entity_relationship(entities: &[Entity], relationships: &[Relationship]) -> String {
+    let mut output = String::from("Entity relationship\n");
+    for entity in entities {
+        writeln!(&mut output, "  [{}]", entity.name).unwrap();
+        for field in &entity.fields {
+            match &field.note {
+                Some(note) => writeln!(
+                    &mut output,
+                    "    - {} : {} ({})",
+                    field.name, field.field_type, note
+                )
+                .unwrap(),
+                None => {
+                    writeln!(&mut output, "    - {} : {}", field.name, field.field_type).unwrap()
+                }
+            }
+        }
+    }
+    if !relationships.is_empty() {
+        output.push('\n');
+        for relationship in relationships {
+            let connector = ascii_cardinality_connector(relationship.cardinality);
+            match &relationship.label {
+                Some(label) => writeln!(
+                    &mut output,
+                    "  {} {} {} : {}",
+                    relationship.from, connector, relationship.to, label
+                )
+                .unwrap(),
+                None => writeln!(
+                    &mut output,
+                    "  {} {} {}",
+                    relationship.from, connector, relationship.to
+                )
+                .unwrap(),
+            }
+        }
+    }
+    output.trim_end().to_owned()
+}
+
+fn ascii_cardinality_connector(cardinality: Cardinality) -> &'static str {
+    match cardinality {
+        Cardinality::OneToOne => "||--||",
+        Cardinality::OneToMany => "||--o{",
+        Cardinality::ManyToOne => "}o--||",
+        Cardinality::ManyToMany => "}o--o{",
+    }
 }
 
 fn render_mermaid_entity_relationship(
@@ -2241,7 +2283,58 @@ fn escape_html(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{Diagram, Document, Edge, Section, TreeNode, Verification};
+    use crate::model::{
+        Cardinality, Diagram, Document, Edge, Entity, Field, Relationship, Section, TreeNode,
+        Verification,
+    };
+
+    fn er_diagram_sample() -> Diagram {
+        Diagram::EntityRelationship {
+            entities: vec![
+                Entity {
+                    name: "User".into(),
+                    fields: vec![
+                        Field {
+                            name: "id".into(),
+                            field_type: "uuid".into(),
+                            note: Some("PK".into()),
+                        },
+                        Field {
+                            name: "email".into(),
+                            field_type: "string".into(),
+                            note: None,
+                        },
+                    ],
+                },
+                Entity {
+                    name: "Order".into(),
+                    fields: vec![
+                        Field {
+                            name: "id".into(),
+                            field_type: "uuid".into(),
+                            note: Some("PK".into()),
+                        },
+                        Field {
+                            name: "user_id".into(),
+                            field_type: "uuid".into(),
+                            note: Some("FK".into()),
+                        },
+                        Field {
+                            name: "total".into(),
+                            field_type: "decimal".into(),
+                            note: None,
+                        },
+                    ],
+                },
+            ],
+            relationships: vec![Relationship {
+                from: "User".into(),
+                to: "Order".into(),
+                cardinality: Cardinality::OneToMany,
+                label: Some("places".into()),
+            }],
+        }
+    }
     use crate::{ExamplePreset, example_document};
 
     fn sample_document() -> Document {
@@ -2704,6 +2797,42 @@ mod tests {
         let html = render_document(&doc, OutputFormat::Html);
         assert!(html.contains("Dependency tree"));
         assert!(html.contains("<svg viewBox="));
+    }
+
+    #[test]
+    fn entity_relationship_renders_ascii_with_entities_fields_and_relationships() {
+        let doc = doc_with_diagram("ER ASCII rendering", er_diagram_sample());
+
+        let terminal = render_document(&doc, OutputFormat::Terminal);
+
+        assert!(
+            terminal.contains("Entity relationship"),
+            "ASCII output should label the diagram type, got:\n{terminal}"
+        );
+        assert!(
+            terminal.contains("[User]"),
+            "ASCII output should show the User entity header, got:\n{terminal}"
+        );
+        assert!(
+            terminal.contains("[Order]"),
+            "ASCII output should show the Order entity header, got:\n{terminal}"
+        );
+        assert!(
+            terminal.contains("id : uuid (PK)"),
+            "ASCII output should show field name, type, and note, got:\n{terminal}"
+        );
+        assert!(
+            terminal.contains("email : string"),
+            "ASCII output should show fields without notes, got:\n{terminal}"
+        );
+        assert!(
+            terminal.contains("user_id : uuid (FK)"),
+            "ASCII output should show foreign key fields, got:\n{terminal}"
+        );
+        assert!(
+            terminal.contains("User ||--o{ Order : places"),
+            "ASCII output should show relationship with cardinality and label, got:\n{terminal}"
+        );
     }
 
     #[test]
