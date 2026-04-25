@@ -2034,11 +2034,65 @@ fn ascii_cardinality_connector(cardinality: Cardinality) -> &'static str {
 }
 
 fn render_mermaid_entity_relationship(
-    _entities: &[Entity],
-    _relationships: &[Relationship],
+    entities: &[Entity],
+    relationships: &[Relationship],
 ) -> String {
-    // Stub: replaced by the TDD step that drives a real Mermaid renderer.
-    String::from("erDiagram")
+    let mut output = String::from("erDiagram\n");
+    for relationship in relationships {
+        let connector = mermaid_cardinality_connector(relationship.cardinality);
+        let label = relationship
+            .label
+            .as_deref()
+            .map(escape_mermaid_text)
+            .unwrap_or_else(|| String::from("relates"));
+        writeln!(
+            &mut output,
+            "    {} {connector} {} : {label}",
+            mermaid_entity_id(&relationship.from),
+            mermaid_entity_id(&relationship.to),
+        )
+        .unwrap();
+    }
+    for entity in entities {
+        writeln!(&mut output, "    {} {{", mermaid_entity_id(&entity.name)).unwrap();
+        for field in &entity.fields {
+            let field_type = sanitize_node(&field.field_type);
+            let field_name = sanitize_node(&field.name);
+            match &field.note {
+                Some(note) => writeln!(
+                    &mut output,
+                    "        {field_type} {field_name} {}",
+                    mermaid_field_note(note)
+                )
+                .unwrap(),
+                None => writeln!(&mut output, "        {field_type} {field_name}").unwrap(),
+            }
+        }
+        writeln!(&mut output, "    }}").unwrap();
+    }
+    output.trim_end().to_owned()
+}
+
+fn mermaid_cardinality_connector(cardinality: Cardinality) -> &'static str {
+    match cardinality {
+        Cardinality::OneToOne => "||--||",
+        Cardinality::OneToMany => "||--o{",
+        Cardinality::ManyToOne => "}o--||",
+        Cardinality::ManyToMany => "}o--o{",
+    }
+}
+
+fn mermaid_entity_id(name: &str) -> String {
+    sanitize_node(name).to_uppercase()
+}
+
+fn mermaid_field_note(note: &str) -> String {
+    let upper = note.to_uppercase();
+    if upper == "PK" || upper == "FK" || upper == "UK" {
+        upper
+    } else {
+        format!("\"{}\"", escape_mermaid_text(note))
+    }
 }
 
 fn render_entity_relationship_svg(
@@ -2797,6 +2851,46 @@ mod tests {
         let html = render_document(&doc, OutputFormat::Html);
         assert!(html.contains("Dependency tree"));
         assert!(html.contains("<svg viewBox="));
+    }
+
+    #[test]
+    fn entity_relationship_renders_mermaid_block_in_markdown() {
+        let doc = doc_with_diagram("ER mermaid rendering", er_diagram_sample());
+
+        let markdown = render_document(&doc, OutputFormat::Markdown);
+
+        assert!(
+            markdown.contains("```mermaid"),
+            "ER markdown output should be wrapped in a mermaid fence, got:\n{markdown}"
+        );
+        assert!(
+            markdown.contains("erDiagram"),
+            "mermaid block should declare an erDiagram, got:\n{markdown}"
+        );
+        assert!(
+            markdown.contains("USER ||--o{ ORDER : places"),
+            "mermaid block should encode the relationship with cardinality, got:\n{markdown}"
+        );
+        assert!(
+            markdown.contains("USER {"),
+            "mermaid block should open a USER entity definition, got:\n{markdown}"
+        );
+        assert!(
+            markdown.contains("uuid id PK"),
+            "mermaid block should encode field type, name, and note, got:\n{markdown}"
+        );
+        assert!(
+            markdown.contains("string email"),
+            "mermaid block should encode notes-less fields, got:\n{markdown}"
+        );
+        assert!(
+            markdown.contains("ORDER {"),
+            "mermaid block should open an ORDER entity definition, got:\n{markdown}"
+        );
+        assert!(
+            markdown.contains("uuid user_id FK"),
+            "mermaid block should encode foreign-key fields, got:\n{markdown}"
+        );
     }
 
     #[test]
