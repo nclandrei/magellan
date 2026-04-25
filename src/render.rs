@@ -482,7 +482,7 @@ fn html_style() -> &'static str {
     .content {
       margin-left: var(--sidebar-width);
       flex: 1;
-      max-width: 820px;
+      max-width: 1080px;
       padding: 32px 36px 72px;
     }
     .hero {
@@ -572,7 +572,7 @@ fn html_style() -> &'static str {
       color: var(--ink);
       border-color: var(--accent);
     }
-    .section-body {
+    .section-body > p {
       max-width: 64ch;
     }
     .section-body p:last-child {
@@ -592,6 +592,8 @@ fn html_style() -> &'static str {
       background: var(--surface);
       padding: 16px;
       cursor: zoom-in;
+      width: 100%;
+      max-width: none;
     }
     .lightbox[hidden] {
       display: none;
@@ -653,6 +655,7 @@ fn html_style() -> &'static str {
       display: block;
       width: 100%;
       height: auto;
+      min-height: 260px;
     }
     details {
       margin-top: 16px;
@@ -3070,6 +3073,42 @@ mod tests {
         let html = render_document(&doc, OutputFormat::Html);
         assert!(html.contains("Dependency tree"));
         assert!(html.contains("<svg viewBox="));
+    }
+
+    #[test]
+    fn html_inline_diagrams_break_out_of_paragraph_reading_width() {
+        let rendered = render_document(&sample_document(), OutputFormat::Html);
+
+        // Prose paragraphs should still cap around 64 characters for readability.
+        assert!(
+            rendered.contains(".section-body > p {")
+                && rendered.contains(".section-body > p {\n      max-width: 64ch;"),
+            "section-body paragraphs (not the whole body) should cap at 64ch for readable prose"
+        );
+        // The unscoped `.section-body { max-width: 64ch }` rule must be gone so that
+        // diagrams can use the full content width.
+        assert!(
+            !rendered.contains(".section-body {\n      max-width: 64ch;"),
+            "section-body itself must not cap width — that squeezes inline diagrams"
+        );
+        // Diagrams should explicitly opt out of the prose width and span the column.
+        assert!(
+            rendered.contains(".diagram {")
+                && rendered.contains("max-width: none;")
+                && rendered.contains("width: 100%;"),
+            "the .diagram block should declare width: 100% and max-width: none so it can grow"
+        );
+        // Give the report column more horizontal room so the diagrams have space to breathe.
+        assert!(
+            rendered.contains("max-width: 1080px"),
+            ".content max-width should grow to 1080px so diagrams render larger"
+        );
+        // Inline SVGs need a comfortable minimum rendered height so text inside them
+        // stays readable and stops overflowing on small viewBoxes.
+        assert!(
+            rendered.contains(".diagram svg {") && rendered.contains("min-height: 260px;"),
+            "diagram SVGs should get a min-height so inline text stays legible"
+        );
     }
 
     #[test]
