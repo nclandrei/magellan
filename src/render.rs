@@ -1621,6 +1621,45 @@ fn svg_shell(
       font-size: 12px;
       fill: var(--diagram-text-muted, #a09890);
     }}
+    .er-entity {{
+      fill: var(--diagram-node-fill, #1b1a18);
+      stroke: var(--diagram-stroke, rgba(160, 152, 144, 0.55));
+      stroke-width: 1.2;
+    }}
+    .er-entity-header {{
+      fill: var(--diagram-lane, rgba(255, 255, 255, 0.08));
+      stroke: var(--diagram-stroke, rgba(160, 152, 144, 0.55));
+      stroke-width: 0;
+    }}
+    .er-entity-title {{
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 13px;
+      font-weight: 700;
+      fill: var(--diagram-text, #d9d5d0);
+    }}
+    .er-field {{
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      font-weight: 600;
+      fill: var(--diagram-text, #d9d5d0);
+    }}
+    .er-field-type {{
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      fill: var(--diagram-text-muted, #a09890);
+    }}
+    .er-field-key {{
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      fill: var(--accent-strong, #c0b8b0);
+    }}
+    .er-field-note {{
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      fill: var(--diagram-text-muted, #a09890);
+    }}
   </style>
   <defs>
     <marker id=\"{marker_id}\" viewBox=\"0 0 10 10\" refX=\"8\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto-start-reverse\">
@@ -2097,12 +2136,192 @@ fn mermaid_field_note(note: &str) -> String {
 
 fn render_entity_relationship_svg(
     id: &str,
-    _entities: &[Entity],
-    _relationships: &[Relationship],
+    entities: &[Entity],
+    relationships: &[Relationship],
 ) -> String {
-    // Stub: replaced by the TDD step that drives a real SVG renderer.
+    let padding = 24;
+    let header_height = 32;
+    let row_height = 22;
+    let entity_gap_x = 40;
+    let entity_gap_y = 32;
+    let columns: usize = if entities.len() <= 2 {
+        entities.len()
+    } else {
+        2
+    }
+    .max(1);
+    let rows = entities.len().div_ceil(columns).max(1);
     let marker_id = format!("{id}-arrow");
-    svg_shell(id, 320, 120, &marker_id, "Entity relationship", "")
+
+    // Compute a single entity box width that fits the widest header and field row.
+    let mut max_chars: usize = 0;
+    for entity in entities {
+        max_chars = max_chars.max(entity.name.len());
+        for field in &entity.fields {
+            let mut row_chars = field.name.len() + field.field_type.len() + 4; // " : " separator + padding
+            if let Some(note) = &field.note {
+                row_chars += note.len() + 3; // " (note)"
+            }
+            max_chars = max_chars.max(row_chars);
+        }
+    }
+    let entity_width: i32 = ((max_chars as i32) * 8 + 32).clamp(180, 260);
+    let entity_height =
+        |entity: &Entity| -> i32 { header_height + entity.fields.len() as i32 * row_height + 8 };
+    let max_entity_height: i32 = entities.iter().map(entity_height).max().unwrap_or(64);
+
+    let width = padding * 2
+        + columns as i32 * entity_width
+        + (columns.saturating_sub(1)) as i32 * entity_gap_x;
+    let height = padding * 2
+        + rows as i32 * max_entity_height
+        + (rows.saturating_sub(1)) as i32 * entity_gap_y;
+
+    let positions: Vec<(&str, (i32, i32))> = entities
+        .iter()
+        .enumerate()
+        .map(|(index, entity)| {
+            let row = index / columns;
+            let col = index % columns;
+            let x = padding + col as i32 * (entity_width + entity_gap_x);
+            let y = padding + row as i32 * (max_entity_height + entity_gap_y);
+            (entity.name.as_str(), (x, y))
+        })
+        .collect();
+
+    let mut body = String::new();
+
+    // Draw relationship lines first so entity boxes paint on top.
+    for relationship in relationships {
+        let Some((from_x, from_y)) = positions
+            .iter()
+            .find(|(name, _)| *name == relationship.from.as_str())
+            .map(|(_, p)| *p)
+        else {
+            continue;
+        };
+        let Some((to_x, to_y)) = positions
+            .iter()
+            .find(|(name, _)| *name == relationship.to.as_str())
+            .map(|(_, p)| *p)
+        else {
+            continue;
+        };
+        let start_x = from_x + entity_width / 2;
+        let start_y = from_y + max_entity_height / 2;
+        let end_x = to_x + entity_width / 2;
+        let end_y = to_y + max_entity_height / 2;
+        write!(
+            &mut body,
+            "<line class=\"connector\" x1=\"{start_x}\" y1=\"{start_y}\" x2=\"{end_x}\" y2=\"{end_y}\" marker-end=\"url(#{marker_id})\"/>"
+        )
+        .unwrap();
+
+        let mid_x = (start_x + end_x) / 2;
+        let mid_y = (start_y + end_y) / 2;
+        let cardinality_glyph = ascii_cardinality_connector(relationship.cardinality);
+        let combined_label = match &relationship.label {
+            Some(label) => format!("{cardinality_glyph}  {label}"),
+            None => cardinality_glyph.to_string(),
+        };
+        write_multiline_svg_text(
+            &mut body,
+            mid_x,
+            mid_y - 6,
+            std::slice::from_ref(&combined_label),
+            "middle",
+            "edge-copy",
+        );
+    }
+
+    for (entity, (x, y)) in entities.iter().zip(positions.iter().map(|(_, p)| *p)) {
+        let h = entity_height(entity);
+
+        // Outer box
+        write!(
+            &mut body,
+            "<rect class=\"er-entity\" x=\"{x}\" y=\"{y}\" width=\"{entity_width}\" height=\"{h}\" rx=\"8\" ry=\"8\"/>"
+        )
+        .unwrap();
+
+        // Header band
+        write!(
+            &mut body,
+            "<rect class=\"er-entity-header\" x=\"{x}\" y=\"{y}\" width=\"{entity_width}\" height=\"{header_height}\" rx=\"8\" ry=\"8\"/>"
+        )
+        .unwrap();
+
+        // Header text (entity name)
+        write_multiline_svg_text(
+            &mut body,
+            x + entity_width / 2,
+            y + 20,
+            std::slice::from_ref(&entity.name),
+            "middle",
+            "er-entity-title",
+        );
+
+        // Field rows
+        let field_x_left = x + 12;
+        let field_x_right = x + entity_width - 12;
+        for (field_index, field) in entity.fields.iter().enumerate() {
+            let row_y = y + header_height + (field_index as i32) * row_height + 4;
+            let baseline = row_y + 14;
+
+            // Subtle separator above each field row except the first
+            if field_index > 0 {
+                let sep_y = row_y;
+                write!(
+                    &mut body,
+                    "<line class=\"lane\" x1=\"{x}\" y1=\"{sep_y}\" x2=\"{}\" y2=\"{sep_y}\" style=\"stroke-dasharray:none;stroke-width:0.6\"/>",
+                    x + entity_width
+                )
+                .unwrap();
+            }
+
+            // Marker (PK/FK/etc.) on the right
+            if let Some(note) = &field.note {
+                let upper = note.to_uppercase();
+                let class = if upper == "PK" || upper == "FK" || upper == "UK" {
+                    "er-field-key"
+                } else {
+                    "er-field-note"
+                };
+                write!(
+                    &mut body,
+                    "<text class=\"{class}\" x=\"{field_x_right}\" y=\"{baseline}\" text-anchor=\"end\">{}</text>",
+                    escape_html(note)
+                )
+                .unwrap();
+            }
+
+            // Field name
+            write!(
+                &mut body,
+                "<text class=\"er-field\" x=\"{field_x_left}\" y=\"{baseline}\" text-anchor=\"start\">{}</text>",
+                escape_html(&field.name)
+            )
+            .unwrap();
+
+            // Field type, slightly right of center, muted
+            write!(
+                &mut body,
+                "<text class=\"er-field-type\" x=\"{}\" y=\"{baseline}\" text-anchor=\"start\">{}</text>",
+                x + entity_width / 2 - 4,
+                escape_html(&field.field_type)
+            )
+            .unwrap();
+        }
+    }
+
+    svg_shell(
+        id,
+        width.max(360),
+        height.max(160),
+        &marker_id,
+        "Entity relationship",
+        &body,
+    )
 }
 
 fn render_ascii_edges(title: &str, edges: &[Edge]) -> String {
@@ -2851,6 +3070,60 @@ mod tests {
         let html = render_document(&doc, OutputFormat::Html);
         assert!(html.contains("Dependency tree"));
         assert!(html.contains("<svg viewBox="));
+    }
+
+    #[test]
+    fn entity_relationship_renders_html_svg_with_entities_and_relationships() {
+        let doc = doc_with_diagram("ER HTML rendering", er_diagram_sample());
+
+        let html = render_document(&doc, OutputFormat::Html);
+
+        assert!(
+            html.contains("Entity relationship"),
+            "HTML output should label the diagram type, got truncated:\n{}",
+            html.chars().take(400).collect::<String>()
+        );
+        assert!(
+            html.contains("<svg viewBox="),
+            "HTML output should embed an SVG"
+        );
+        assert!(
+            html.contains("class=\"er-entity\""),
+            "ER SVG should expose dedicated entity styling"
+        );
+        assert!(
+            html.contains("class=\"er-entity-header\""),
+            "ER SVG should mark the entity title row"
+        );
+        assert!(
+            html.contains("class=\"er-field\""),
+            "ER SVG should mark field rows"
+        );
+        assert!(
+            html.contains(">User<") && html.contains(">Order<"),
+            "ER SVG should include entity names as text"
+        );
+        assert!(
+            html.contains(">id<") && html.contains(">email<") && html.contains(">user_id<"),
+            "ER SVG should include field names as text"
+        );
+        assert!(
+            html.contains(">uuid<") && html.contains(">decimal<"),
+            "ER SVG should include field types as text"
+        );
+        assert!(
+            html.contains(">PK<") && html.contains(">FK<"),
+            "ER SVG should render note markers"
+        );
+        // ASCII fallback should still be present in the figure
+        assert!(
+            html.contains("ASCII fallback"),
+            "ER figure should keep an ASCII fallback section"
+        );
+        assert!(
+            html.contains("User ||--o{ Order : places"),
+            "ASCII fallback should include the relationship line"
+        );
     }
 
     #[test]
