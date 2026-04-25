@@ -4,7 +4,10 @@ use std::fmt::Write;
 use anyhow::{Context, Result};
 use schemars::schema_for;
 
-use crate::model::{BeforeAfterDiagram, Diagram, Document, Edge, Section, TimelineEvent, TreeNode};
+use crate::model::{
+    BeforeAfterDiagram, Diagram, Document, Edge, Entity, Relationship, Section, TimelineEvent,
+    TreeNode,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OutputFormat {
@@ -832,6 +835,10 @@ fn render_svg_diagram(index: usize, diagram: &Diagram) -> String {
         Diagram::DependencyTree { root, children } => {
             render_dependency_tree_svg(&diagram_id, root, children)
         }
+        Diagram::EntityRelationship {
+            entities,
+            relationships,
+        } => render_entity_relationship_svg(&diagram_id, entities, relationships),
     }
 }
 
@@ -1869,6 +1876,7 @@ fn diagram_title(diagram: &Diagram) -> &'static str {
         Diagram::StateMachine { .. } => "State machine",
         Diagram::Table { .. } => "Table",
         Diagram::DependencyTree { .. } => "Dependency tree",
+        Diagram::EntityRelationship { .. } => "Entity relationship",
     }
 }
 
@@ -1952,6 +1960,10 @@ fn render_ascii_diagram(diagram: &Diagram) -> String {
             render_ascii_tree_children(&mut output, children, "");
             output.trim_end().to_owned()
         }
+        Diagram::EntityRelationship {
+            entities,
+            relationships,
+        } => render_ascii_entity_relationship(entities, relationships),
     }
 }
 
@@ -1969,6 +1981,32 @@ fn render_ascii_tree_children(output: &mut String, children: &[TreeNode], prefix
             render_ascii_tree_children(output, &child.children, &child_prefix);
         }
     }
+}
+
+fn render_ascii_entity_relationship(
+    _entities: &[Entity],
+    _relationships: &[Relationship],
+) -> String {
+    // Stub: replaced by the TDD step that drives a real ASCII renderer.
+    String::from("ER diagram")
+}
+
+fn render_mermaid_entity_relationship(
+    _entities: &[Entity],
+    _relationships: &[Relationship],
+) -> String {
+    // Stub: replaced by the TDD step that drives a real Mermaid renderer.
+    String::from("erDiagram")
+}
+
+fn render_entity_relationship_svg(
+    id: &str,
+    _entities: &[Entity],
+    _relationships: &[Relationship],
+) -> String {
+    // Stub: replaced by the TDD step that drives a real SVG renderer.
+    let marker_id = format!("{id}-arrow");
+    svg_shell(id, 320, 120, &marker_id, "Entity relationship", "")
 }
 
 fn render_ascii_edges(title: &str, edges: &[Edge]) -> String {
@@ -2168,6 +2206,10 @@ fn render_mermaid_diagram(diagram: &Diagram) -> String {
             // future consumers that still funnel table diagrams through mermaid.
             render_markdown_table(headers, rows)
         }
+        Diagram::EntityRelationship {
+            entities,
+            relationships,
+        } => render_mermaid_entity_relationship(entities, relationships),
     }
 }
 
