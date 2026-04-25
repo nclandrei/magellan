@@ -113,6 +113,7 @@ Diagram picking:
   state_machine    States connected by labeled transitions
   table            Rows and columns for comparisons or field mappings
   dependency_tree  Hierarchical parent-child relationships
+  entity_relationship  Data model: entities with fields and labeled relationships
 
 Prompt workflow:
   Use `magellan prompt` when you want Magellan to teach the agent how to build

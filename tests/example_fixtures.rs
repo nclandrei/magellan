@@ -15,7 +15,7 @@ fn fixture_path(relative: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join(relative)
 }
 
-fn fixture_cases() -> [FixtureCase; 7] {
+fn fixture_cases() -> [FixtureCase; 8] {
     [
         FixtureCase {
             path: "examples/session-walkthrough.json",
@@ -133,6 +133,37 @@ fn fixture_cases() -> [FixtureCase; 7] {
                 "Magellan walkthrough",
                 "class=\"sidebar\"",
                 "Table",
+                "ASCII fallback",
+            ],
+        },
+        FixtureCase {
+            path: "examples/entity-relationship-billing-schema.json",
+            title: "Entity relationship: billing schema after the customer split",
+            terminal_markers: &[
+                "Entity relationship",
+                "[Customer]",
+                "[Subscription]",
+                "[Invoice]",
+                "Customer ||--o{ Subscription : owns",
+                "id : uuid (PK)",
+                "customer_id : uuid (FK)",
+            ],
+            markdown_markers: &[
+                "## Billing entities",
+                "```mermaid",
+                "erDiagram",
+                "CUSTOMER ||--o{ SUBSCRIPTION : owns",
+                "SUBSCRIPTION ||--o{ INVOICE : bills",
+                "uuid id PK",
+                "uuid customer_id FK",
+            ],
+            html_markers: &[
+                "Magellan walkthrough",
+                "class=\"sidebar\"",
+                "Entity relationship",
+                "class=\"er-entity\"",
+                "class=\"er-entity-header\"",
+                "class=\"er-field\"",
                 "ASCII fallback",
             ],
         },
